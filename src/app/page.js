@@ -3,14 +3,13 @@ import { cookies } from 'next/headers';
 import Image from 'next/image';
 import Link from 'next/link';
 
-// Esta é a forma mais moderna e correta de buscar dados em um Componente de Servidor
 async function getPecas() {
   const supabase = createServerComponentClient({ cookies });
   const { data, error } = await supabase
     .from('pecas')
     .select('*')
-    .eq('status', 'Disponível') // Filtra para mostrar apenas peças disponíveis
-    .order('created_at', { ascending: false }); // Ordena pelas mais recentes
+    .eq('status', 'Disponível')
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error("Erro ao buscar peças para a home:", error);
@@ -36,10 +35,8 @@ export default async function Home() {
           {pecas.map((peca) => (
             <Link href={`/peca/${peca.id}`} key={peca.id}>
               <div className="border rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer group">
-                {/* Imagem do Produto - AGORA CORRIGIDA */}
                 <div className="relative w-full h-80">
                   <Image
-                    // Pega a primeira imagem da lista 'imagens'
                     src={peca.imagens?.[0] || '/placeholder.jpg'} 
                     alt={peca.nome}
                     fill
@@ -48,7 +45,6 @@ export default async function Home() {
                   />
                 </div>
                 
-                {/* Informações do Produto */}
                 <div className="p-4 bg-white">
                   <h2 className="text-xl font-semibold text-gray-800 truncate">{peca.nome}</h2>
                   <p className="text-md text-gray-600 mt-1">Tamanho: {peca.tamanho}</p>

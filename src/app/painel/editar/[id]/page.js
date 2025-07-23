@@ -2,7 +2,7 @@
 
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { AddPieceForm } from '../../AddPieceForm.js'; // Importamos nosso formulário
+import AddPieceForm from '../../AddPieceForm.js'; // CORRIGIDO: Importação sem chaves
 import Link from 'next/link';
 
 // Função para buscar os dados de uma peça específica

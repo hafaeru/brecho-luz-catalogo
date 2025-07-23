@@ -7,10 +7,8 @@ import { revalidatePath } from 'next/cache';
 
 const supabase = createServerComponentClient({ cookies });
 
-// Função auxiliar para fazer o upload de um arquivo
 async function uploadFile(file) {
     if (!file || file.size === 0) return null;
-    // Limpa o nome do arquivo para ser seguro para URL/Storage
     const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '');
     const fileName = `${Date.now()}-${cleanFileName}`;
     
@@ -20,12 +18,10 @@ async function uploadFile(file) {
         
     if (error) throw error;
     
-    // Pega a URL pública do arquivo que acabamos de enviar
     const { data: urlData } = supabase.storage.from('fotos-pecas').getPublicUrl(data.path);
     return urlData.publicUrl;
 }
 
-// LÓGICA PARA ADICIONAR UMA NOVA PEÇA
 export async function createPiece(formData) {
   try {
     const fotos = [
@@ -43,7 +39,7 @@ export async function createPiece(formData) {
       composicao_tecido: formData.get('composicao'),
       estado_conservacao: formData.get('estado'),
       avarias: formData.get('avarias'), descricao: formData.get('descricao'),
-      tags: formData.get('tags'), status: formData.get('status'), modelagem: formData.get('modelagem'),
+      tags: formData.get('tags'), status: 'Disponível', modelagem: formData.get('modelagem'),
       imagens: fotoUrls.filter(url => url !== null),
       medida_busto: formData.get('busto') || null,
       medida_ombro: formData.get('ombro') || null,
@@ -59,18 +55,15 @@ export async function createPiece(formData) {
 
   } catch (error) {
     console.error('Erro ao criar peça:', error);
-    // Idealmente, retornar o erro para a UI para o usuário saber o que aconteceu
   }
 
-  revalidatePath('/'); // Limpa o cache da página inicial
-  revalidatePath('/painel/catalogo'); // Limpa o cache do painel
+  revalidatePath('/');
+  revalidatePath('/painel/catalogo');
   redirect('/painel/catalogo');
 }
 
-// LÓGICA PARA ATUALIZAR UMA PEÇA EXISTENTE
 export async function updatePiece(formData) {
   const id = formData.get('id');
-
   const dataToUpdate = {
     nome: formData.get('nome'), categoria: formData.get('categoria'),
     preco: formData.get('preco'), tamanho: formData.get('tamanho'),
@@ -95,38 +88,32 @@ export async function updatePiece(formData) {
     console.error('Erro ao atualizar peça:', error);
   }
 
-  revalidatePath('/'); // Limpa o cache da página inicial
-  revalidatePath('/painel/catalogo'); // Limpa o cache do painel
+  revalidatePath('/');
+  revalidatePath('/painel/catalogo');
   redirect('/painel/catalogo');
 }
 
-// LÓGICA PARA DELETAR UMA PEÇA
 export async function deletePiece(formData) {
-  const id = formData.get('id');
-  try {
-    const { data: peca, error: fetchError } = await supabase
-      .from('pecas')
-      .select('imagens')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    if (peca.imagens && peca.imagens.length > 0) {
-      const filePaths = peca.imagens.map(url => url.substring(url.lastIndexOf('/') + 1));
-      if (filePaths.length > 0) {
-        await supabase.storage.from('fotos-pecas').remove(filePaths);
-      }
-    }
-
-    const { error: deleteError } = await supabase.from('pecas').delete().eq('id', id);
-    if (deleteError) throw deleteError;
-
-  } catch (error) {
-    console.error('Erro ao deletar peça:', error);
-  }
+    const id = formData.get('id');
+    try {
+      const { data: peca, error: fetchError } = await supabase.from('pecas').select('imagens').eq('id', id).single();
+      if (fetchError) throw fetchError;
   
-  revalidatePath('/'); // Limpa o cache da página inicial
-  revalidatePath('/painel/catalogo'); // Limpa o cache do painel
+      if (peca.imagens && peca.imagens.length > 0) {
+        const filePaths = peca.imagens.map(url => url.substring(url.lastIndexOf('/') + 1));
+        if (filePaths.length > 0) {
+          await supabase.storage.from('fotos-pecas').remove(filePaths);
+        }
+      }
+  
+      const { error: deleteError } = await supabase.from('pecas').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+  
+    } catch (error) {
+      console.error('Erro ao deletar peça:', error);
+    }
+  
+  revalidatePath('/');
+  revalidatePath('/painel/catalogo');
   redirect('/painel/catalogo');
 }

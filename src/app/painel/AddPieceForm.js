@@ -3,8 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createPiece, updatePiece } from './actions.js';
 
-export function AddPieceForm({ pecaInicial }) {
-  // Estados do formulário
+export default function AddPieceForm({ pecaInicial }) {
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState('');
   const [preco, setPreco] = useState('');
@@ -17,8 +16,8 @@ export function AddPieceForm({ pecaInicial }) {
   const [descricao, setDescricao] = useState('');
   const [tags, setTags] = useState('');
   const [medidas, setMedidas] = useState({});
+  const [modelagem, setModelagem] = useState('');
 
-  // Efeito para preencher o formulário no modo de edição
   useEffect(() => {
     if (pecaInicial) {
       setNome(pecaInicial.nome || '');
@@ -33,15 +32,14 @@ export function AddPieceForm({ pecaInicial }) {
       setDescricao(pecaInicial.descricao || '');
       setTags(pecaInicial.tags || '');
       setMedidas(pecaInicial.medidas || {});
+      setModelagem(pecaInicial.modelagem || '');
     }
   }, [pecaInicial]);
 
-  // Função para lidar com a mudança nos campos de medida
   const handleMedidaChange = (e) => {
     setMedidas(prevMedidas => ({ ...prevMedidas, [e.target.name]: e.target.value }));
   };
   
-  // Lógica para renderizar campos de medida dinâmicos
   const MedidasFields = useMemo(() => {
     const camposPartesDeCima = (
         <>
@@ -56,12 +54,12 @@ export function AddPieceForm({ pecaInicial }) {
           <input name="cintura" value={medidas.cintura || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Cintura (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
           <input name="quadril" value={medidas.quadril || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Quadril (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
           <input name="gancho" value={medidas.gancho || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Gancho/Cavalo (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-          <input name="comprimento" value={medidas.comprimento || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="comprimento_calca" value={medidas.comprimento_calca || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </>
       );
   
     switch(categoria) {
-      case 'Blusas': case 'Camisas': case 'Tops': case 'Body': case 'Casacos e Jaquetas': case 'Tricot':
+      case 'Blusas': case 'Camisas': case 'Tops': case 'Body': case 'Casacos e Jaquetas': case 'Tricot': case 'Alfaiataria':
         return camposPartesDeCima;
       case 'Calças': case 'Shorts':
         return camposPartesDeBaixo;
@@ -95,6 +93,7 @@ export function AddPieceForm({ pecaInicial }) {
           <label htmlFor="categoria" className="block text-sm font-medium text-gray-700">Categoria</label>
           <select id="categoria" name="categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
             <option value="">-- Selecione --</option>
+            <option>Alfaiataria</option>
             <option>Blusas</option><option>Camisas</option><option>Calças</option><option>Saias</option><option>Shorts</option><option>Vestidos</option><option>Macacão / Macaquinho</option><option>Conjuntos</option><option>Tops</option><option>Body</option><option>Casacos e Jaquetas</option><option>Tricot</option><option>Acessórios</option><option>Calçados</option>
           </select>
         </div>
@@ -111,12 +110,12 @@ export function AddPieceForm({ pecaInicial }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
-          <label htmlFor="tamanho" className="block text-sm font-medium text-gray-700">Tamanho na Etiqueta</label>
-          <input type="text" id="tamanho" name="tamanho" value={tamanho} onChange={(e) => setTamanho(e.target.value)} placeholder="Ex: P, 42, Único" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <label htmlFor="tamanho" className="block text-sm font-medium text-gray-700">Tamanho na Etiqueta</label>
+            <input type="text" id="tamanho" name="tamanho" value={tamanho} onChange={(e) => setTamanho(e.target.value)} placeholder="Ex: P, 42, Único" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
         <div>
-          <label htmlFor="preco" className="block text-sm font-medium text-gray-700">Preço (R$)</label>
-          <input type="number" step="0.01" id="preco" name="preco" value={preco} onChange={(e) => setPreco(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <label htmlFor="preco" className="block text-sm font-medium text-gray-700">Preço (R$)</label>
+            <input type="number" step="0.01" id="preco" name="preco" value={preco} onChange={(e) => setPreco(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
         <div>
           <label htmlFor="marca" className="block text-sm font-medium text-gray-700">Marca</label>
@@ -149,6 +148,12 @@ export function AddPieceForm({ pecaInicial }) {
         <label htmlFor="avarias" className="block text-sm font-medium text-gray-700">Avarias (se houver, senão 'Nenhuma')</label>
         <input type="text" id="avarias" name="avarias" value={avarias} onChange={(e) => setAvarias(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
       </div>
+      <div>
+        <label htmlFor="modelagem" className="block text-sm font-medium text-gray-700">Modelagem e Detalhes</label>
+        <textarea id="modelagem" name="modelagem" value={modelagem} onChange={(e) => setModelagem(e.target.value)} rows="4" 
+                  placeholder="Ex: Corte reto com ombros estruturados&#10;Dois botões frontais&#10;Dois bolsos com tampa"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
+      </div>
        <div>
         <label htmlFor="descricao" className="block text-sm font-medium text-gray-700">Descrição</label>
         <textarea id="descricao" name="descricao" value={descricao} onChange={(e) => setDescricao(e.target.value)} rows="3" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
@@ -158,12 +163,21 @@ export function AddPieceForm({ pecaInicial }) {
         <input type="text" id="tags" name="tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Ex: Novidade, Verão, Floral" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
       </div>
       
-      {/* Seção de upload de fotos não será exibida no modo de edição por enquanto para simplificar a lógica de update */}
       {!pecaInicial && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Fotos da Peça (pode selecionar várias)</label>
-            <input type="file" name="fotos" required multiple className="mt-1 block w-full text-sm text-gray-500 ..."/>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Fotos da Peça</label>
+          <div className="space-y-3 p-4 border rounded-md bg-gray-50">
+            <div>
+              <label htmlFor="fotoFrente" className="text-sm text-gray-600">Foto da Frente (obrigatória)</label>
+              <input type="file" id="fotoFrente" name="fotoFrente" required className="mt-1 block w-full text-sm text-gray-500 ..."/>
+            </div>
+            <div>
+              <label htmlFor="fotoCostas" className="text-sm text-gray-600">Foto das Costas</label>
+              <input type="file" id="fotoCostas" name="fotoCostas" className="mt-1 block w-full text-sm text-gray-500 ..."/>
+            </div>
+            {/* ... e assim por diante para todas as fotos */}
           </div>
+        </div>
       )}
       
       <button type="submit" className="w-full px-4 py-3 font-bold text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors">

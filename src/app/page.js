@@ -1,16 +1,26 @@
-import { supabase } from '@/lib/supabaseClient';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import Image from 'next/image';
-import Link from 'next/link'; // 1. Adicionamos a importação do Link
+import Link from 'next/link';
 
-export default async function Home() {
-  const { data: pecas, error } = await supabase
+// Esta é a forma mais moderna e correta de buscar dados em um Componente de Servidor
+async function getPecas() {
+  const supabase = createServerComponentClient({ cookies });
+  const { data, error } = await supabase
     .from('pecas')
     .select('*')
-    .eq('disponivel', true);
+    .eq('status', 'Disponível') // Filtra para mostrar apenas peças disponíveis
+    .order('created_at', { ascending: false }); // Ordena pelas mais recentes
 
   if (error) {
-    return <p>Ocorreu um erro ao buscar as peças. Tente novamente.</p>;
+    console.error("Erro ao buscar peças para a home:", error);
+    return [];
   }
+  return data;
+}
+
+export default async function Home() {
+  const pecas = await getPecas();
 
   return (
     <main className="container mx-auto p-4 sm:p-8">
@@ -22,22 +32,19 @@ export default async function Home() {
       {pecas.length === 0 ? (
         <p className="text-center text-gray-500">Nenhuma peça disponível no momento. Volte em breve!</p>
       ) : (
-        // Container do Grid
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-          {/* Mapeando cada peça para um "Card" */}
           {pecas.map((peca) => (
-            // 2. Envolvemos todo o card com o componente Link
-            // A 'key' passa do 'div' para o 'Link', que é o elemento pai agora.
             <Link href={`/peca/${peca.id}`} key={peca.id}>
-              <div className="border rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer">
-                {/* Imagem do Produto */}
+              <div className="border rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer group">
+                {/* Imagem do Produto - AGORA CORRIGIDA */}
                 <div className="relative w-full h-80">
                   <Image
-                    src={peca.imagem_url}
+                    // Pega a primeira imagem da lista 'imagens'
+                    src={peca.imagens?.[0] || '/placeholder.jpg'} 
                     alt={peca.nome}
-                    fill // 'fill' faz a imagem preencher o container
-                    style={{ objectFit: 'cover' }} // Garante que a imagem cubra o espaço sem distorcer
-                    className="transition-transform duration-300 hover:scale-105"
+                    fill
+                    style={{ objectFit: 'cover' }}
+                    className="transition-transform duration-300 group-hover:scale-105"
                   />
                 </div>
                 

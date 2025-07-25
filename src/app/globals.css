@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #fff2dd;
   --foreground: #171717;
 }
 
@@ -23,4 +23,23 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+header {
+  background-color: #d0ab81;
+}
+
+.font-lato {
+  font-family: var(--font-lato);
+}
+.font-mulish {
+  font-family: var(--font-mulish);
+}
+.font-nunito {
+  font-family: var(--font-nunito);
+}
+.font-poppins {
+  font-family: var(--font-poppins);
+}
+.font-quicksand {
+  font-family: var(--font-quicksand);
 }

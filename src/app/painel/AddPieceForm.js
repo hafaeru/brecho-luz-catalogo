@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { createPiece, updatePiece } from './actions.js';
 
 export default function AddPieceForm({ pecaInicial }) {
+  // Estados do formulário
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState('');
   const [preco, setPreco] = useState('');
@@ -19,6 +20,7 @@ export default function AddPieceForm({ pecaInicial }) {
   const [modelagem, setModelagem] = useState('');
   const [status, setStatus] = useState('Disponível');
 
+  // Efeito para preencher o formulário no modo de edição
   useEffect(() => {
     if (pecaInicial) {
       setNome(pecaInicial.nome || '');
@@ -38,10 +40,12 @@ export default function AddPieceForm({ pecaInicial }) {
     }
   }, [pecaInicial]);
 
+  // Função para lidar com a mudança nos campos de medida
   const handleMedidaChange = (e) => {
     setMedidas(prevMedidas => ({ ...prevMedidas, [e.target.name]: e.target.value }));
   };
   
+  // Lógica para renderizar campos de medida dinâmicos
   const MedidasFields = useMemo(() => {
     const camposPartesDeCima = (
         <>
@@ -61,7 +65,8 @@ export default function AddPieceForm({ pecaInicial }) {
       );
   
     switch(categoria) {
-      case 'Blusas': case 'Camisas': case 'Tops': case 'Body': case 'Casacos e Jaquetas': case 'Tricot': case 'Alfaiataria': case 'Coletes':
+      case 'Blusas': case 'Camisas': case 'Tops': case 'Body': case 'Casacos e Jaquetas': case 'Tricot': 
+      case 'Alfaiataria': case 'Coletes':
         return camposPartesDeCima;
       case 'Calças': case 'Shorts':
         return camposPartesDeBaixo;
@@ -81,7 +86,11 @@ export default function AddPieceForm({ pecaInicial }) {
   return (
     <form action={pecaInicial ? updatePiece : createPiece} className="mt-8 p-6 bg-white rounded-lg shadow-lg space-y-6">
       {pecaInicial && <input type="hidden" name="id" value={pecaInicial.id} />}
-      <h2 className="text-2xl font-semibold text-gray-800">{pecaInicial ? `Editando Peça: ${pecaInicial.nome}`: 'Adicionar Nova Peça'}</h2>
+      
+      <h2 className="text-2xl font-semibold text-gray-800">
+        {pecaInicial ? `Editando Peça: ${pecaInicial.nome}` : 'Adicionar Nova Peça'}
+      </h2>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label htmlFor="nome" className="block text-sm font-medium text-gray-700">Nome da Peça</label>
@@ -109,12 +118,16 @@ export default function AddPieceForm({ pecaInicial }) {
           </select>
         </div>
       </div>
+
       {MedidasFields && (
         <div>
           <label className="block text-sm font-medium text-gray-700">Medidas Precisas (cm)</label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">{MedidasFields}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">
+            {MedidasFields}
+          </div>
         </div>
       )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
             <label htmlFor="tamanho" className="block text-sm font-medium text-gray-700">Tamanho na Etiqueta</label>
@@ -129,6 +142,7 @@ export default function AddPieceForm({ pecaInicial }) {
           <input type="text" id="marca" name="marca" value={marca} onChange={(e) => setMarca(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label htmlFor="estado" className="block text-sm font-medium text-gray-700">Estado de Conservação</label>
@@ -145,34 +159,42 @@ export default function AddPieceForm({ pecaInicial }) {
           <input type="text" id="cor" name="cor" value={cor} onChange={(e) => setCor(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
       </div>
+
       <div>
         <label htmlFor="modelagem" className="block text-sm font-medium text-gray-700">Modelagem e Detalhes</label>
-        <textarea id="modelagem" name="modelagem" value={modelagem} onChange={(e) => setModelagem(e.target.value)} rows="4" placeholder="Ex: Corte reto com ombros estruturados&#10;Dois botões frontais&#10;Dois bolsos com tampa" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
+        <textarea id="modelagem" name="modelagem" value={modelagem} onChange={(e) => setModelagem(e.target.value)} rows="4" 
+                  placeholder="Ex: Corte reto com ombros estruturados&#10;Dois botões frontais&#10;Dois bolsos com tampa"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
       </div>
-      <div>
+
+       <div>
         <label htmlFor="composicao" className="block text-sm font-medium text-gray-700">Composição do Tecido</label>
         <input type="text" id="composicao" name="composicao" value={composicao} onChange={(e) => setComposicao(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
       </div>
-      <div>
-        <label htmlFor="avarias" className="block text-sm font-medium text-gray-700">Avarias (se houver, 'Nenhuma')</label>
+       <div>
+        <label htmlFor="avarias" className="block text-sm font-medium text-gray-700">Avarias (se houver, senão 'Nenhuma')</label>
         <input type="text" id="avarias" name="avarias" value={avarias} onChange={(e) => setAvarias(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
       </div>
-      <div>
+       <div>
         <label htmlFor="descricao" className="block text-sm font-medium text-gray-700">Descrição</label>
         <textarea id="descricao" name="descricao" value={descricao} onChange={(e) => setDescricao(e.target.value)} rows="3" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
       </div>
-      <div>
+       <div>
         <label htmlFor="tags" className="block text-sm font-medium text-gray-700">Tags (separadas por vírgula)</label>
         <input type="text" id="tags" name="tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Ex: Novidade, Verão, Floral" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
       </div>
+      
       {pecaInicial && (
         <div>
           <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status da Peça</label>
           <select id="status" name="status" value={status} onChange={(e) => setStatus(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
-            <option>Disponível</option><option>Reservado</option><option>Vendido</option>
+            <option>Disponível</option>
+            <option>Reservado</option>
+            <option>Vendido</option>
           </select>
         </div>
       )}
+
       {!pecaInicial && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Fotos da Peça</label>
@@ -204,6 +226,7 @@ export default function AddPieceForm({ pecaInicial }) {
           </div>
         </div>
       )}
+      
       <button type="submit" className="w-full px-4 py-3 font-bold text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors">
         {pecaInicial ? 'Atualizar Peça' : 'Salvar Peça'}
       </button>

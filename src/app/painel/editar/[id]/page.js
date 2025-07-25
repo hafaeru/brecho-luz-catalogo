@@ -1,8 +1,6 @@
-// Em: src/app/painel/editar/[id]/page.js
-
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import AddPieceForm from '../../AddPieceForm.js'; // CORRIGIDO: Importação sem chaves
+import AddPieceForm from '../../AddPieceForm.js';
 import Link from 'next/link';
 
 // Função para buscar os dados de uma peça específica
@@ -22,13 +20,14 @@ export default async function EditPage({ params }) {
 
   return (
     <div className="container mx-auto p-4 sm:p-8">
-        <Link href="/painel/catalogo" className="text-yellow-600 hover:underline mb-6 inline-block">
+        <Link href="/painel/catalogo" className="text-amber-900 hover:underline mb-6 inline-block" style={{ fontFamily: 'var(--font-poppins)' }}>
             &larr; Voltar para o Catálogo
         </Link>
       {peca ? (
+        // Passamos a propriedade `pecaInicial` para o formulário
         <AddPieceForm pecaInicial={peca} />
       ) : (
-        <p>Peça não encontrada.</p>
+        <p className="text-stone-500" style={{ fontFamily: 'var(--font-nunito)' }}>Peça não encontrada.</p>
       )}
     </div>
   );

@@ -1,13 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { useRouter } from 'next/navigation';
+import { useState, useMemo, useEffect } from 'react';
+import { createPiece, updatePiece } from '../actions.js';
 
-export default function AddPieceForm() {
-  const supabase = createClientComponentClient();
-  const router = useRouter();
-
+export default function AddPieceForm({ pecaInicial }) {
   // Estados do formulário
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -21,138 +17,111 @@ export default function AddPieceForm() {
   const [descricao, setDescricao] = useState('');
   const [tags, setTags] = useState('');
   const [medidas, setMedidas] = useState({});
+  const [modelagem, setModelagem] = useState('');
+  const [status, setStatus] = useState('Disponível');
 
-  // Estados separados para cada foto
-  const [fotoFrente, setFotoFrente] = useState(null);
-  const [fotoCostas, setFotoCostas] = useState(null);
-  const [fotoEtiqueta, setFotoEtiqueta] = useState(null);
-  const [fotoComposicao, setFotoComposicao] = useState(null);
-  const [fotoDetalhe, setFotoDetalhe] = useState(null);
-  const [fotoAvaria, setFotoAvaria] = useState(null);
+  // Efeito para preencher o formulário no modo de edição
+  useEffect(() => {
+    if (pecaInicial) {
+      setNome(pecaInicial.nome || '');
+      setCategoria(pecaInicial.categoria || '');
+      setPreco(pecaInicial.preco || '');
+      setTamanho(pecaInicial.tamanho || '');
+      setMarca(pecaInicial.marca || '');
+      setCor(pecaInicial.cor || '');
+      setComposicao(pecaInicial.composicao_tecido || '');
+      setEstado(pecaInicial.estado_conservacao || '');
+      setAvarias(pecaInicial.avarias || '');
+      setDescricao(pecaInicial.descricao || '');
+      setTags(pecaInicial.tags || '');
+      setMedidas(pecaInicial.medidas || {});
+      setModelagem(pecaInicial.modelagem || '');
+      setStatus(pecaInicial.status || 'Disponível');
+    }
+  }, [pecaInicial]);
 
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', content: '' });
-
+  // Função para lidar com a mudança nos campos de medida
   const handleMedidaChange = (e) => {
-    setMedidas({ ...medidas, [e.target.name]: e.target.value });
-  };
-
-  // Função auxiliar para upload de um arquivo
-  const uploadFile = async (file) => {
-    if (!file) return null;
-    const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '');
-    const fileName = `${Date.now()}-${cleanFileName}`;
-    const { data, error } = await supabase.storage.from('fotos-pecas').upload(fileName, file);
-    if (error) throw error;
-    const { data: urlData } = supabase.storage.from('fotos-pecas').getPublicUrl(data.path);
-    return urlData.publicUrl;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!fotoFrente) {
-      setMessage({ type: 'error', content: 'A foto da frente é obrigatória.' });
-      return;
-    }
-    setLoading(true);
-    setMessage({ type: '', content: '' });
-
-    try {
-      // 1. Upload de TODAS as fotos selecionadas
-      const fotoUrls = await Promise.all([
-        uploadFile(fotoFrente),
-        uploadFile(fotoCostas),
-        uploadFile(fotoEtiqueta),
-        uploadFile(fotoComposicao),
-        uploadFile(fotoDetalhe),
-        uploadFile(fotoAvaria),
-      ]);
-
-      // 2. Salvar as Informações
-      const { error: insertError } = await supabase.from('pecas').insert([
-        { 
-          nome, categoria, preco, tamanho, marca, cor,
-          composicao_tecido: composicao,
-          estado_conservacao: estado,
-          avarias, descricao, tags,
-          medidas,
-          imagens: fotoUrls.filter(url => url !== null), // Salva apenas os links das fotos que foram enviadas
-        },
-      ]);
-
-      if (insertError) throw insertError;
-
-      setMessage({ type: 'success', content: 'Peça cadastrada com sucesso!' });
-      e.target.reset(); // Limpa o formulário
-      setMedidas({}); // Limpa as medidas
-
-      router.refresh('/');
-
-    } catch (error) {
-      setMessage({ type: 'error', content: 'Ocorreu um erro: ' + error.message });
-    } finally {
-      setLoading(false);
-    }
+    setMedidas(prevMedidas => ({ ...prevMedidas, [e.target.name]: e.target.value }));
   };
   
+  // Lógica para renderizar campos de medida dinâmicos
   const MedidasFields = useMemo(() => {
-    // ... (O código dos campos de medida permanece o mesmo da versão anterior)
     const camposPartesDeCima = (
-      <>
-        <input name="busto" onChange={handleMedidaChange} type="number" placeholder="Busto/Tórax (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-        <input name="ombro" onChange={handleMedidaChange} type="number" placeholder="Ombro a ombro (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-        <input name="manga" onChange={handleMedidaChange} type="number" placeholder="Comprimento da Manga (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-        <input name="comprimento" onChange={handleMedidaChange} type="number" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-      </>
-    );
+        <>
+          <input name="busto" value={medidas.busto || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Busto/Tórax (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="ombro" value={medidas.ombro || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Ombro a ombro (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="manga" value={medidas.manga || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento da Manga (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="comprimento" value={medidas.comprimento || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+        </>
+      );
     const camposPartesDeBaixo = (
-      <>
-        <input name="cintura" onChange={handleMedidaChange} type="number" placeholder="Cintura (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-        <input name="quadril" onChange={handleMedidaChange} type="number" placeholder="Quadril (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-        <input name="gancho" onChange={handleMedidaChange} type="number" placeholder="Gancho/Cavalo (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-        <input name="comprimento" onChange={handleMedidaChange} type="number" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-      </>
-    );
-
+        <>
+          <input name="cintura" value={medidas.cintura || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Cintura (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="quadril" value={medidas.quadril || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Quadril (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="gancho" value={medidas.gancho || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Gancho/Cavalo (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="comprimento_calca" value={medidas.comprimento_calca || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+        </>
+      );
+  
     switch(categoria) {
-      case 'Blusas': case 'Camisas': case 'Tops': case 'Body': case 'Casacos e Jaquetas': case 'Tricot':
+      case 'Blusas': case 'Camisas': case 'Tops': case 'Body': case 'Casacos e Jaquetas': case 'Tricot': 
+      case 'Alfaiataria': case 'Coletes':
         return camposPartesDeCima;
       case 'Calças': case 'Shorts':
         return camposPartesDeBaixo;
       case 'Saias':
         return <>
-            <input name="cintura" onChange={handleMedidaChange} type="number" placeholder="Cintura (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-            <input name="quadril" onChange={handleMedidaChange} type="number" placeholder="Quadril (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-            <input name="comprimento" onChange={handleMedidaChange} type="number" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <input name="cintura" value={medidas.cintura || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Cintura (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <input name="quadril" value={medidas.quadril || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Quadril (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <input name="comprimento" value={medidas.comprimento || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </>;
       case 'Vestidos': case 'Macacão / Macaquinho':
-        return <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{camposPartesDeCima}{camposPartesDeBaixo}</div>;
+        return <div className="contents">{camposPartesDeCima}{camposPartesDeBaixo}</div>;
       default:
         return null;
     }
-  }, [categoria]);
+  }, [categoria, medidas]);
 
   return (
-    <form onSubmit={handleSubmit} className="mt-8 p-6 bg-white rounded-lg shadow-lg space-y-6">
-      <h2 className="text-2xl font-semibold text-gray-800">Adicionar Nova Peça</h2>
+    <form action={pecaInicial ? updatePiece : createPiece} className="mt-8 p-6 bg-white rounded-lg shadow-lg space-y-6">
+      {pecaInicial && <input type="hidden" name="id" value={pecaInicial.id} />}
+      
+      <h2 className="text-2xl font-bold text-amber-900" style={{ fontFamily: 'var(--font-lato)' }}>
+        {pecaInicial ? `Editando Peça: ${pecaInicial.nome}` : 'Adicionar Nova Peça'}
+      </h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label htmlFor="nome" className="block text-sm font-medium text-gray-700">Nome da Peça</label>
-          <input type="text" id="nome" onChange={(e) => setNome(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <label htmlFor="nome" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Nome da Peça</label>
+          <input type="text" id="nome" name="nome" value={nome} onChange={(e) => setNome(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
         <div>
-          <label htmlFor="categoria" className="block text-sm font-medium text-gray-700">Categoria</label>
-          <select id="categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
-            <option value="">-- Selecione uma Categoria --</option>
-            <option>Blusas</option><option>Camisas</option><option>Calças</option><option>Saias</option><option>Shorts</option><option>Vestidos</option><option>Macacão / Macaquinho</option><option>Conjuntos</option><option>Tops</option><option>Body</option><option>Casacos e Jaquetas</option><option>Tricot</option><option>Acessórios</option><option>Calçados</option>
+          <label htmlFor="categoria" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Categoria</label>
+          <select id="categoria" name="categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+            <option value="">-- Selecione --</option>
+            <option>Alfaiataria</option>
+            <option>Blusas</option>
+            <option>Calçados</option>
+            <option>Camisas</option>
+            <option>Casacos e Jaquetas</option>
+            <option>Coletes</option>
+            <option>Conjuntos</option>
+            <option>Saias</option>
+            <option>Shorts</option>
+            <option>Tops</option>
+            <option>Body</option>
+            <option>Tricot</option>
+            <option>Vestidos</option>
+            <option>Macacão / Macaquinho</option>
+            <option>Acessórios</option>
           </select>
         </div>
       </div>
 
       {MedidasFields && (
         <div>
-          <label className="block text-sm font-medium text-gray-700">Medidas Precisas (cm)</label>
+          <label className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Medidas Precisas (cm)</label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">
             {MedidasFields}
           </div>
@@ -161,24 +130,24 @@ export default function AddPieceForm() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
-            <label htmlFor="tamanho" className="block text-sm font-medium text-gray-700">Tamanho na Etiqueta</label>
-            <input type="text" id="tamanho" onChange={(e) => setTamanho(e.target.value)} placeholder="Ex: P, 42, Único" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <label htmlFor="tamanho" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Tamanho na Etiqueta</label>
+            <input type="text" id="tamanho" name="tamanho" value={tamanho} onChange={(e) => setTamanho(e.target.value)} placeholder="Ex: P, 42, Único" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
         <div>
-            <label htmlFor="preco" className="block text-sm font-medium text-gray-700">Preço (R$)</label>
-            <input type="number" step="0.01" id="preco" onChange={(e) => setPreco(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <label htmlFor="preco" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Preço (R$)</label>
+            <input type="number" step="0.01" id="preco" name="preco" value={preco} onChange={(e) => setPreco(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
         <div>
-          <label htmlFor="marca" className="block text-sm font-medium text-gray-700">Marca</label>
-          <input type="text" id="marca" onChange={(e) => setMarca(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <label htmlFor="marca" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Marca</label>
+          <input type="text" id="marca" name="marca" value={marca} onChange={(e) => setMarca(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label htmlFor="estado" className="block text-sm font-medium text-gray-700">Estado de Conservação</label>
-          <select id="estado" value={estado} onChange={(e) => setEstado(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
-            <option value="">-- Selecione o Estado --</option>
+          <label htmlFor="estado" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Estado de Conservação</label>
+          <select id="estado" name="estado" value={estado} onChange={(e) => setEstado(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+            <option value="">-- Selecione --</option>
             <option>Como Novo</option>
             <option>Excelente</option>
             <option>Ótimo</option>
@@ -186,63 +155,80 @@ export default function AddPieceForm() {
           </select>
         </div>
         <div>
-          <label htmlFor="cor" className="block text-sm font-medium text-gray-700">Cor</label>
-          <input type="text" id="cor" onChange={(e) => setCor(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <label htmlFor="cor" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Cor</label>
+          <input type="text" id="cor" name="cor" value={cor} onChange={(e) => setCor(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
       </div>
 
       <div>
-        <label htmlFor="composicao" className="block text-sm font-medium text-gray-700">Composição do Tecido</label>
-        <input type="text" id="composicao" onChange={(e) => setComposicao(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-      </div>
-       <div>
-        <label htmlFor="avarias" className="block text-sm font-medium text-gray-700">Avarias (se houver, senão digite 'Nenhuma')</label>
-        <input type="text" id="avarias" onChange={(e) => setAvarias(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
-      </div>
-       <div>
-        <label htmlFor="descricao" className="block text-sm font-medium text-gray-700">Descrição (história da peça, etc.)</label>
-        <textarea id="descricao" onChange={(e) => setDescricao(e.target.value)} rows="3" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
-      </div>
-       <div>
-        <label htmlFor="tags" className="block text-sm font-medium text-gray-700">Tags (separadas por vírgula)</label>
-        <input type="text" id="tags" onChange={(e) => setTags(e.target.value)} placeholder="Ex: Novidade da Semana, Verão, Floral" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+        <label htmlFor="modelagem" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Modelagem e Detalhes</label>
+        <textarea id="modelagem" name="modelagem" value={modelagem} onChange={(e) => setModelagem(e.target.value)} rows="4" 
+                  placeholder="Ex: Corte reto com ombros estruturados&#10;Dois botões frontais&#10;Dois bolsos com tampa"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Fotos da Peça</label>
-        <div className="space-y-3 p-4 border rounded-md bg-gray-50">
-          <div>
-            <label htmlFor="fotoFrente" className="text-sm text-gray-600">Foto da Frente (obrigatória)</label>
-            <input type="file" id="fotoFrente" onChange={(e) => setFotoFrente(e.target.files[0])} required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-          </div>
-          <div>
-            <label htmlFor="fotoCostas" className="text-sm text-gray-600">Foto das Costas</label>
-            <input type="file" id="fotoCostas" onChange={(e) => setFotoCostas(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-          </div>
-          <div>
-            <label htmlFor="fotoEtiqueta" className="text-sm text-gray-600">Foto da Etiqueta (Marca/Tamanho)</label>
-            <input type="file" id="fotoEtiqueta" onChange={(e) => setFotoEtiqueta(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-          </div>
-          <div>
-            <label htmlFor="fotoComposicao" className="text-sm text-gray-600">Foto da Etiqueta de Composição</label>
-            <input type="file" id="fotoComposicao" onChange={(e) => setFotoComposicao(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-          </div>
-          <div>
-            <label htmlFor="fotoDetalhe" className="text-sm text-gray-600">Foto de um Detalhe Especial</label>
-            <input type="file" id="fotoDetalhe" onChange={(e) => setFotoDetalhe(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-          </div>
-           <div>
-            <label htmlFor="fotoAvaria" className="text-sm text-gray-600">Foto da Avaria (se houver)</label>
-            <input type="file" id="fotoAvaria" onChange={(e) => setFotoAvaria(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-          </div>
-        </div>
+       <div>
+        <label htmlFor="composicao" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Composição do Tecido</label>
+        <input type="text" id="composicao" name="composicao" value={composicao} onChange={(e) => setComposicao(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+      </div>
+       <div>
+        <label htmlFor="avarias" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Avarias (se houver, senão 'Nenhuma')</label>
+        <input type="text" id="avarias" name="avarias" value={avarias} onChange={(e) => setAvarias(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+      </div>
+       <div>
+        <label htmlFor="descricao" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Descrição</label>
+        <textarea id="descricao" name="descricao" value={descricao} onChange={(e) => setDescricao(e.target.value)} rows="3" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
+      </div>
+       <div>
+        <label htmlFor="tags" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Tags (separadas por vírgula)</label>
+        <input type="text" id="tags" name="tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Ex: Novidade, Verão, Floral" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
       </div>
       
-      {message.content && (
-        <p className={`text-center text-sm ${message.type === 'success' ? 'text-green-500' : 'text-red-500'}`}>{message.content}</p>
+      {pecaInicial && (
+        <div>
+          <label htmlFor="status" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Status da Peça</label>
+          <select id="status" name="status" value={status} onChange={(e) => setStatus(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+            <option>Disponível</option>
+            <option>Reservado</option>
+            <option>Vendido</option>
+          </select>
+        </div>
       )}
-      <button type="submit" disabled={loading} className="w-full px-4 py-3 font-bold text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors disabled:bg-gray-400">
-        {loading ? 'Salvando...' : 'Salvar Peça'}
+
+      {!pecaInicial && (
+        <div>
+          <label className="block text-sm font-medium text-cyan-800 mb-2" style={{ fontFamily: 'var(--font-poppins)' }}>Fotos da Peça</label>
+          <div className="space-y-3 p-4 border rounded-md bg-gray-50">
+            <div>
+              <label htmlFor="fotoFrente" className="text-sm text-gray-600">Foto da Frente (obrigatória)</label>
+              <input type="file" id="fotoFrente" name="fotoFrente" required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            </div>
+            <div>
+              <label htmlFor="fotoCostas" className="text-sm text-gray-600">Foto das Costas</label>
+              <input type="file" id="fotoCostas" name="fotoCostas" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            </div>
+            <div>
+              <label htmlFor="fotoEtiqueta" className="text-sm text-gray-600">Foto da Etiqueta (Marca/Tamanho)</label>
+              <input type="file" id="fotoEtiqueta" name="fotoEtiqueta" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            </div>
+            <div>
+              <label htmlFor="fotoComposicao" className="text-sm text-gray-600">Foto da Etiqueta de Composição</label>
+              <input type="file" id="fotoComposicao" name="fotoComposicao" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            </div>
+            <div>
+              <label htmlFor="fotoDetalhe" className="text-sm text-gray-600">Foto de um Detalhe Especial</label>
+              <input type="file" id="fotoDetalhe" name="fotoDetalhe" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            </div>
+             <div>
+              <label htmlFor="fotoAvaria" className="text-sm text-gray-600">Foto da Avaria (se houver)</label>
+              <input type="file" id="fotoAvaria" name="fotoAvaria" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <button type="submit" className="w-full px-4 py-3 font-bold text-white bg-rose-500 rounded-md hover:bg-rose-600 transition-colors">
+        {pecaInicial ? 'Atualizar Peça' : 'Salvar Peça'}
       </button>
     </form>
   );

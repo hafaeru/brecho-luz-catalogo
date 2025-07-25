@@ -24,9 +24,7 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
-header {
-  background-color: #d0ab81;
-}
+
 
 .font-lato {
   font-family: var(--font-lato);

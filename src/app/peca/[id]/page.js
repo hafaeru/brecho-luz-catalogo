@@ -6,6 +6,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
+import CartIcon from '@/app/CartIcon';
+
+
+
 
 function LoadingSpinner() {
   return <div className="text-center p-12">Carregando detalhes da peça...</div>;
@@ -103,9 +107,7 @@ export default function PecaDetalhe() {
           
           <p className="text-4xl font-bold text-orange-500" style={{ fontFamily: 'var(--font-space-grotesk)' }}>R$ {peca.preco}</p>
           
-          <a href={linkWhatsApp} target="_blank" rel="noopener noreferrer" className="w-full text-center px-6 py-3 font-bold text-white bg-rose-500 rounded-lg hover:bg-rose-600 transition-colors">
-            Tenho Interesse!
-          </a>
+
 
           {peca.descricao && <p className="text-stone-500 text-base  leading-relaxed whitespace-pre-wrap" style={{ fontFamily: 'var(--font-nunito)' }}>{peca.descricao}</p>}
           

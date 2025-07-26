@@ -7,6 +7,15 @@ import { revalidatePath } from 'next/cache';
 
 const supabase = createServerComponentClient({ cookies });
 
+// Função auxiliar para sanitizar valores numéricos
+const parseToFloatOrNull = (value) => {
+  if (value === '' || value === null || value === undefined) {
+    return null;
+  }
+  const num = parseFloat(value);
+  return isNaN(num) ? null : num;
+};
+
 // Função auxiliar para upload de um arquivo
 async function uploadFile(file) {
     if (!file || file.size === 0) return null;
@@ -18,7 +27,7 @@ async function uploadFile(file) {
     return urlData.publicUrl;
 }
 
-// LÓGICA PARA ADICIONAR UMA NOVA PEÇA
+// LÓGICA PARA ADICIONAR UMA NOVA PEÇA (COM SANITIZAÇÃO)
 export async function createPiece(formData) {
   try {
     const fotos = [
@@ -35,7 +44,7 @@ export async function createPiece(formData) {
     const pecaData = {
       nome: formData.get('nome'),
       categoria: formData.get('categoria'),
-      preco: formData.get('preco'),
+      preco: parseToFloatOrNull(formData.get('preco')),
       tamanho: formData.get('tamanho'),
       marca: formData.get('marca'),
       cor: formData.get('cor'),
@@ -47,14 +56,13 @@ export async function createPiece(formData) {
       status: 'Disponível',
       modelagem: formData.get('modelagem'),
       imagens: fotoUrls.filter(url => url !== null),
-      // CORREÇÃO APLICADA AQUI: Lendo os nomes corretos do formulário
-      medida_busto: formData.get('busto') || null,
-      medida_ombro: formData.get('ombro') || null,
-      medida_manga: formData.get('manga') || null,
-      medida_cintura: formData.get('cintura') || null,
-      medida_quadril: formData.get('quadril') || null,
-      medida_gancho: formData.get('gancho') || null,
-      medida_comprimento: formData.get('comprimento') || formData.get('comprimento_calca') || null,
+      medida_busto: parseToFloatOrNull(formData.get('busto')),
+      medida_ombro: parseToFloatOrNull(formData.get('ombro')),
+      medida_manga: parseToFloatOrNull(formData.get('manga')),
+      medida_cintura: parseToFloatOrNull(formData.get('cintura')),
+      medida_quadril: parseToFloatOrNull(formData.get('quadril')),
+      medida_gancho: parseToFloatOrNull(formData.get('gancho')),
+      medida_comprimento: parseToFloatOrNull(formData.get('comprimento')) || parseToFloatOrNull(formData.get('comprimento_calca')),
     };
 
     const { error } = await supabase.from('pecas').insert([pecaData]);
@@ -69,14 +77,14 @@ export async function createPiece(formData) {
   redirect('/painel/catalogo');
 }
 
-// LÓGICA PARA ATUALIZAR UMA PEÇA EXISTENTE
+// LÓGICA PARA ATUALIZAR UMA PEÇA EXISTENTE (COM SANITIZAÇÃO)
 export async function updatePiece(formData) {
   const id = formData.get('id');
 
   const dataToUpdate = {
     nome: formData.get('nome'),
     categoria: formData.get('categoria'),
-    preco: formData.get('preco'),
+    preco: parseToFloatOrNull(formData.get('preco')),
     tamanho: formData.get('tamanho'),
     marca: formData.get('marca'),
     cor: formData.get('cor'),
@@ -87,14 +95,13 @@ export async function updatePiece(formData) {
     tags: formData.get('tags'),
     status: formData.get('status'),
     modelagem: formData.get('modelagem'),
-    // CORREÇÃO APLICADA AQUI: Lendo os nomes corretos do formulário
-    medida_busto: formData.get('busto') || null,
-    medida_ombro: formData.get('ombro') || null,
-    medida_manga: formData.get('manga') || null,
-    medida_cintura: formData.get('cintura') || null,
-    medida_quadril: formData.get('quadril') || null,
-    medida_gancho: formData.get('gancho') || null,
-    medida_comprimento: formData.get('comprimento') || formData.get('comprimento_calca') || null,
+    medida_busto: parseToFloatOrNull(formData.get('busto')),
+    medida_ombro: parseToFloatOrNull(formData.get('ombro')),
+    medida_manga: parseToFloatOrNull(formData.get('manga')),
+    medida_cintura: parseToFloatOrNull(formData.get('cintura')),
+    medida_quadril: parseToFloatOrNull(formData.get('quadril')),
+    medida_gancho: parseToFloatOrNull(formData.get('gancho')),
+    medida_comprimento: parseToFloatOrNull(formData.get('comprimento')) || parseToFloatOrNull(formData.get('comprimento_calca')),
   };
 
   try {
@@ -139,11 +146,10 @@ export async function deletePiece(formData) {
   redirect('/painel/catalogo');
 }
 
-// Adicione esta função no final do seu arquivo actions.js
+// LÓGICA PARA ATUALIZAR O STATUS
 export async function updatePieceStatus(formData) {
   const id = formData.get('id');
   const newStatus = formData.get('status');
-  const supabase = createServerComponentClient({ cookies });
 
   try {
     const { error } = await supabase
@@ -157,7 +163,7 @@ export async function updatePieceStatus(formData) {
     console.error('Erro ao atualizar status da peça:', error);
   }
 
-  revalidatePath('/'); // Limpa o cache da página inicial
-  revalidatePath('/painel/catalogo'); // Limpa o cache do painel
+  revalidatePath('/');
+  revalidatePath('/painel/catalogo');
   redirect('/painel/catalogo');
 }

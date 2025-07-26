@@ -2,8 +2,13 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { createPiece, updatePiece } from './actions.js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
 
 export default function AddPieceForm({ pecaInicial }) {
+  const supabase = createClientComponentClient();
+  const router = useRouter();
+
   // Estados do formulário
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -19,6 +24,18 @@ export default function AddPieceForm({ pecaInicial }) {
   const [medidas, setMedidas] = useState({});
   const [modelagem, setModelagem] = useState('');
   const [status, setStatus] = useState('Disponível');
+  
+  // Estados para cada foto individual
+  const [fotoFrente, setFotoFrente] = useState(null);
+  const [fotoCostas, setFotoCostas] = useState(null);
+  const [fotoEtiqueta, setFotoEtiqueta] = useState(null);
+  const [fotoComposicao, setFotoComposicao] = useState(null);
+  const [fotoDetalhe, setFotoDetalhe] = useState(null);
+  const [fotoAvaria, setFotoAvaria] = useState(null);
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   // Efeito para preencher o formulário no modo de edição
   useEffect(() => {
@@ -34,18 +51,84 @@ export default function AddPieceForm({ pecaInicial }) {
       setAvarias(pecaInicial.avarias || '');
       setDescricao(pecaInicial.descricao || '');
       setTags(pecaInicial.tags || '');
-      setMedidas(pecaInicial.medidas || {});
+      setMedidas({
+          busto: pecaInicial.medida_busto || '',
+          ombro: pecaInicial.medida_ombro || '',
+          manga: pecaInicial.medida_manga || '',
+          cintura: pecaInicial.medida_cintura || '',
+          quadril: pecaInicial.medida_quadril || '',
+          gancho: pecaInicial.medida_gancho || '',
+          comprimento: pecaInicial.medida_comprimento || '',
+          comprimento_calca: pecaInicial.comprimento_calca || ''
+      });
       setModelagem(pecaInicial.modelagem || '');
       setStatus(pecaInicial.status || 'Disponível');
     }
   }, [pecaInicial]);
 
-  // Função para lidar com a mudança nos campos de medida
   const handleMedidaChange = (e) => {
     setMedidas(prevMedidas => ({ ...prevMedidas, [e.target.name]: e.target.value }));
   };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!pecaInicial && !fotoFrente) {
+      setError('A foto da frente é obrigatória.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setMessage('');
+
+    try {
+      let fotoUrls = pecaInicial ? pecaInicial.imagens || [] : [];
+
+      if (!pecaInicial) {
+        const fotosParaUpload = [
+          fotoFrente, fotoCostas, fotoEtiqueta, fotoComposicao, fotoDetalhe, fotoAvaria
+        ].filter(Boolean);
+
+        const uploadPromises = fotosParaUpload.map(async (file) => {
+          const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '');
+          const fileName = `${Date.now()}-${cleanFileName}`;
+          const { data, error: uploadError } = await supabase.storage.from('fotos-pecas').upload(fileName, file);
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage.from('fotos-pecas').getPublicUrl(data.path);
+          return urlData.publicUrl;
+        });
+        fotoUrls = await Promise.all(uploadPromises);
+      }
+      
+      const pecaData = {
+        nome, categoria, preco, tamanho, marca, cor, modelagem,
+        composicao_tecido: composicao, estado_conservacao: estado,
+        avarias, descricao, tags, status,
+        medida_busto: medidas.busto || null,
+        medida_ombro: medidas.ombro || null,
+        medida_manga: medidas.manga || null,
+        medida_cintura: medidas.cintura || null,
+        medida_quadril: medidas.quadril || null,
+        medida_gancho: medidas.gancho || null,
+        medida_comprimento: medidas.comprimento || medidas.comprimento_calca || null,
+      };
+
+      if (pecaInicial) {
+        await updatePiece(pecaInicial.id, pecaData);
+      } else {
+        pecaData.imagens = fotoUrls;
+        await createPiece(pecaData);
+      }
+
+      setMessage('Peça salva com sucesso!');
+      
+    } catch (err) {
+      console.error('Erro no processo:', err);
+      setError('Ocorreu um erro ao salvar a peça: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
   
-  // Lógica para renderizar campos de medida dinâmicos
   const MedidasFields = useMemo(() => {
     const camposPartesDeCima = (
         <>
@@ -84,7 +167,7 @@ export default function AddPieceForm({ pecaInicial }) {
   }, [categoria, medidas]);
 
   return (
-    <form action={pecaInicial ? updatePiece : createPiece} className="mt-8 p-6 bg-white rounded-lg shadow-lg space-y-6">
+    <form onSubmit={handleSubmit} className="mt-8 p-6 bg-white rounded-lg shadow-lg space-y-6">
       {pecaInicial && <input type="hidden" name="id" value={pecaInicial.id} />}
       
       <h2 className="text-2xl font-semibold text-gray-800">
@@ -201,34 +284,37 @@ export default function AddPieceForm({ pecaInicial }) {
           <div className="space-y-3 p-4 border rounded-md bg-gray-50">
             <div>
               <label htmlFor="fotoFrente" className="text-sm text-gray-600">Foto da Frente (obrigatória)</label>
-              <input type="file" id="fotoFrente" name="fotoFrente" required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+              <input type="file" id="fotoFrente" name="fotoFrente" required onChange={(e) => setFotoFrente(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
             </div>
             <div>
               <label htmlFor="fotoCostas" className="text-sm text-gray-600">Foto das Costas</label>
-              <input type="file" id="fotoCostas" name="fotoCostas" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+              <input type="file" id="fotoCostas" name="fotoCostas" onChange={(e) => setFotoCostas(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
             </div>
             <div>
               <label htmlFor="fotoEtiqueta" className="text-sm text-gray-600">Foto da Etiqueta (Marca/Tamanho)</label>
-              <input type="file" id="fotoEtiqueta" name="fotoEtiqueta" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+              <input type="file" id="fotoEtiqueta" name="fotoEtiqueta" onChange={(e) => setFotoEtiqueta(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
             </div>
             <div>
               <label htmlFor="fotoComposicao" className="text-sm text-gray-600">Foto da Etiqueta de Composição</label>
-              <input type="file" id="fotoComposicao" name="fotoComposicao" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+              <input type="file" id="fotoComposicao" name="fotoComposicao" onChange={(e) => setFotoComposicao(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
             </div>
             <div>
               <label htmlFor="fotoDetalhe" className="text-sm text-gray-600">Foto de um Detalhe Especial</label>
-              <input type="file" id="fotoDetalhe" name="fotoDetalhe" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+              <input type="file" id="fotoDetalhe" name="fotoDetalhe" onChange={(e) => setFotoDetalhe(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
             </div>
              <div>
               <label htmlFor="fotoAvaria" className="text-sm text-gray-600">Foto da Avaria (se houver)</label>
-              <input type="file" id="fotoAvaria" name="fotoAvaria" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+              <input type="file" id="fotoAvaria" name="fotoAvaria" onChange={(e) => setFotoAvaria(e.target.files[0])} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
             </div>
           </div>
         </div>
       )}
       
-      <button type="submit" className="w-full px-4 py-3 font-bold text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors">
-        {pecaInicial ? 'Atualizar Peça' : 'Salvar Peça'}
+      {message && <p className="text-sm text-center text-green-600">{message}</p>}
+      {error && <p className="text-sm text-center text-red-600">{error}</p>}
+
+      <button type="submit" disabled={loading} className="w-full px-4 py-3 font-bold text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors disabled:bg-gray-400">
+        {loading ? 'Salvando...' : (pecaInicial ? 'Atualizar Peça' : 'Salvar Peça')}
       </button>
     </form>
   );

@@ -40,7 +40,7 @@ export default function CarrinhoPage() {
                   <p className="text-sm text-stone-500" style={{fontFamily: 'var(--font-nunito)'}}>Tam: {peca.tamanho}</p>
                 </div>
                 <div className="text-right ml-4">
-                  <p className="font-bold text-orange-500" style={{fontFamily: 'var(--font-space-grotesk)'}}>R$ {peca.preco.toFixed(2)}</p>
+                  <p className="font-bold text-orange-500" style={{fontFamily: 'var(--font-nunito)'}}>R$ {peca.preco.toFixed(2)}</p>
                   <button onClick={() => removeFromCart(peca.id)} className="text-xs text-rose-500 hover:underline mt-1">Remover</button>
                 </div>
               </div>

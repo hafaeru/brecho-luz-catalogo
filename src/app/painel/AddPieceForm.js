@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { createPiece, updatePiece } from './actions.js';
+
 
 export default function AddPieceForm({ pecaInicial }) {
   const supabase = createClientComponentClient();

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { createPiece, updatePiece } from './actions.js';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+import { createPiece, updatePiece } from './actions.js';
 
 export default function AddPieceForm({ pecaInicial }) {
   const supabase = createClientComponentClient();
@@ -37,7 +37,7 @@ export default function AddPieceForm({ pecaInicial }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  // Efeito para preencher o formulário no modo de edição
+  // Efeito para preencher o formulário no modo de edição (LÓGICA CORRIGIDA)
   useEffect(() => {
     if (pecaInicial) {
       setNome(pecaInicial.nome || '');
@@ -51,6 +51,7 @@ export default function AddPieceForm({ pecaInicial }) {
       setAvarias(pecaInicial.avarias || '');
       setDescricao(pecaInicial.descricao || '');
       setTags(pecaInicial.tags || '');
+      // CORREÇÃO: Puxa cada medida da sua coluna específica no DB
       setMedidas({
           busto: pecaInicial.medida_busto || '',
           ombro: pecaInicial.medida_ombro || '',
@@ -59,17 +60,19 @@ export default function AddPieceForm({ pecaInicial }) {
           quadril: pecaInicial.medida_quadril || '',
           gancho: pecaInicial.medida_gancho || '',
           comprimento: pecaInicial.medida_comprimento || '',
-          comprimento_calca: pecaInicial.comprimento_calca || ''
+          comprimento_calca: pecaInicial.medida_comprimento || ''
       });
       setModelagem(pecaInicial.modelagem || '');
       setStatus(pecaInicial.status || 'Disponível');
     }
   }, [pecaInicial]);
 
+  // Função para lidar com a mudança nos campos de medida
   const handleMedidaChange = (e) => {
     setMedidas(prevMedidas => ({ ...prevMedidas, [e.target.name]: e.target.value }));
   };
 
+  // Lógica de submissão que faz o upload no cliente
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!pecaInicial && !fotoFrente) {
@@ -84,9 +87,7 @@ export default function AddPieceForm({ pecaInicial }) {
       let fotoUrls = pecaInicial ? pecaInicial.imagens || [] : [];
 
       if (!pecaInicial) {
-        const fotosParaUpload = [
-          fotoFrente, fotoCostas, fotoEtiqueta, fotoComposicao, fotoDetalhe, fotoAvaria
-        ].filter(Boolean);
+        const fotosParaUpload = [fotoFrente, fotoCostas, fotoEtiqueta, fotoComposicao, fotoDetalhe, fotoAvaria].filter(Boolean);
 
         const uploadPromises = fotosParaUpload.map(async (file) => {
           const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '');
@@ -103,6 +104,7 @@ export default function AddPieceForm({ pecaInicial }) {
         nome, categoria, preco, tamanho, marca, cor, modelagem,
         composicao_tecido: composicao, estado_conservacao: estado,
         avarias, descricao, tags, status,
+        // CORREÇÃO: Mapeia do estado 'medidas' para as colunas do DB
         medida_busto: medidas.busto || null,
         medida_ombro: medidas.ombro || null,
         medida_manga: medidas.manga || null,
@@ -120,6 +122,7 @@ export default function AddPieceForm({ pecaInicial }) {
       }
 
       setMessage('Peça salva com sucesso!');
+      router.push('/painel/catalogo');
       
     } catch (err) {
       console.error('Erro no processo:', err);
@@ -128,9 +131,43 @@ export default function AddPieceForm({ pecaInicial }) {
       setLoading(false);
     }
   };
-  
+
+  // Lógica para renderizar campos de medida dinâmicos (Sua lógica original)
   const MedidasFields = useMemo(() => {
-    // ... (O código dos campos de medida permanece o mesmo)
+    const camposPartesDeCima = (
+        <>
+          <input name="busto" value={medidas.busto || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Busto/Tórax (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="ombro" value={medidas.ombro || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Ombro a ombro (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="manga" value={medidas.manga || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento da Manga (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="comprimento" value={medidas.comprimento || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+        </>
+      );
+    const camposPartesDeBaixo = (
+        <>
+          <input name="cintura" value={medidas.cintura || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Cintura (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="quadril" value={medidas.quadril || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Quadril (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="gancho" value={medidas.gancho || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Gancho/Cavalo (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+          <input name="comprimento_calca" value={medidas.comprimento_calca || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+        </>
+      );
+
+    switch(categoria) {
+      case 'Blusas': case 'Camisas': case 'Tops': case 'Body': case 'Casacos e Jaquetas': case 'Tricot':
+      case 'Alfaiataria': case 'Coletes':
+        return camposPartesDeCima;
+      case 'Calças': case 'Shorts':
+        return camposPartesDeBaixo;
+      case 'Saias':
+        return <>
+            <input name="cintura" value={medidas.cintura || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Cintura (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <input name="quadril" value={medidas.quadril || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Quadril (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <input name="comprimento" value={medidas.comprimento || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+        </>;
+      case 'Vestidos': case 'Macacão / Macaquinho':
+        return <div className="contents">{camposPartesDeCima}{camposPartesDeBaixo}</div>;
+      default:
+        return null;
+    }
   }, [categoria, medidas]);
 
   return (
@@ -150,21 +187,7 @@ export default function AddPieceForm({ pecaInicial }) {
           <label htmlFor="categoria" className="block text-sm font-medium text-gray-700">Categoria</label>
           <select id="categoria" name="categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
             <option value="">-- Selecione --</option>
-            <option>Alfaiataria</option>
-            <option>Blusas</option>
-            <option>Calçados</option>
-            <option>Camisas</option>
-            <option>Casacos e Jaquetas</option>
-            <option>Coletes</option>
-            <option>Conjuntos</option>
-            <option>Saias</option>
-            <option>Shorts</option>
-            <option>Tops</option>
-            <option>Body</option>
-            <option>Tricot</option>
-            <option>Vestidos</option>
-            <option>Macacão / Macaquinho</option>
-            <option>Acessórios</option>
+            <option>Alfaiataria</option><option>Blusas</option><option>Calçados</option><option>Camisas</option><option>Casacos e Jaquetas</option><option>Coletes</option><option>Conjuntos</option><option>Saias</option><option>Shorts</option><option>Tops</option><option>Body</option><option>Tricot</option><option>Vestidos</option><option>Macacão / Macaquinho</option><option>Acessórios</option>
           </select>
         </div>
       </div>
@@ -188,8 +211,8 @@ export default function AddPieceForm({ pecaInicial }) {
             <input type="number" step="0.01" id="preco" name="preco" value={preco} onChange={(e) => setPreco(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
         <div>
-          <label htmlFor="marca" className="block text-sm font-medium text-gray-700">Marca</label>
-          <input type="text" id="marca" name="marca" value={marca} onChange={(e) => setMarca(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
+            <label htmlFor="marca" className="block text-sm font-medium text-gray-700">Marca</label>
+            <input type="text" id="marca" name="marca" value={marca} onChange={(e) => setMarca(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
         </div>
       </div>
 
@@ -198,10 +221,7 @@ export default function AddPieceForm({ pecaInicial }) {
           <label htmlFor="estado" className="block text-sm font-medium text-gray-700">Estado de Conservação</label>
           <select id="estado" name="estado" value={estado} onChange={(e) => setEstado(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
             <option value="">-- Selecione --</option>
-            <option>Como Novo</option>
-            <option>Excelente</option>
-            <option>Ótimo</option>
-            <option>Bom com Detalhes</option>
+            <option>Como Novo</option><option>Excelente</option><option>Ótimo</option><option>Bom com Detalhes</option>
           </select>
         </div>
         <div>
@@ -212,12 +232,10 @@ export default function AddPieceForm({ pecaInicial }) {
 
       <div>
         <label htmlFor="modelagem" className="block text-sm font-medium text-gray-700">Modelagem e Detalhes</label>
-        <textarea id="modelagem" name="modelagem" value={modelagem} onChange={(e) => setModelagem(e.target.value)} rows="4" 
-                  placeholder="Ex: Corte reto com ombros estruturados&#10;Dois botões frontais&#10;Dois bolsos com tampa"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
+        <textarea id="modelagem" name="modelagem" value={modelagem} onChange={(e) => setModelagem(e.target.value)} rows="4" placeholder="Ex: Corte reto com ombros estruturados&#10;Dois botões frontais&#10;Dois bolsos com tampa" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
       </div>
 
-       <div>
+      <div>
         <label htmlFor="composicao" className="block text-sm font-medium text-gray-700">Composição do Tecido</label>
         <input type="text" id="composicao" name="composicao" value={composicao} onChange={(e) => setComposicao(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/>
       </div>
@@ -277,12 +295,12 @@ export default function AddPieceForm({ pecaInicial }) {
         </div>
       )}
       
-      {message && <p className="text-sm text-center text-green-600">{message}</p>}
-      {error && <p className="text-sm text-center text-red-600">{error}</p>}
-
-      <button type="submit" disabled={loading} className="w-full px-4 py-3 font-bold text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors disabled:bg-gray-400">
+      <button type="submit" disabled={loading} className="w-full px-4 py-3 font-bold text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors">
         {loading ? 'Salvando...' : (pecaInicial ? 'Atualizar Peça' : 'Salvar Peça')}
       </button>
+      
+      {message && <p className="text-green-500">{message}</p>}
+      {error && <p className="text-red-500">{error}</p>}
     </form>
   );
 }

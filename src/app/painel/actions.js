@@ -1,3 +1,5 @@
+JavaScript
+
 'use server';
 
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -7,7 +9,7 @@ import { revalidatePath } from 'next/cache';
 
 const supabase = createServerComponentClient({ cookies });
 
-// LÓGICA PARA ADICIONAR UMA NOVA PEÇA (RECEBE DADOS PROCESSADOS)
+// AGORA RECEBE UM OBJETO DE DADOS, NÃO UM FORMDATA
 export async function createPiece(pecaData) {
   try {
     const { error } = await supabase.from('pecas').insert([pecaData]);
@@ -20,6 +22,7 @@ export async function createPiece(pecaData) {
   revalidatePath('/painel/catalogo');
   redirect('/painel/catalogo');
 }
+
 
 // LÓGICA PARA ATUALIZAR UMA PEÇA EXISTENTE (RECEBE DADOS PROCESSADOS)
 export async function updatePiece(id, dataToUpdate) {

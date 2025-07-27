@@ -31,16 +31,14 @@ function parseAndConvertFormData(formData) {
     status: formData.get('status'),
     preco: safeParseFloat(formData.get('preco')),
     // Mapeamento de medidas para o JSON no banco de dados
-    medidas: {
-        busto: safeParseFloat(formData.get('busto')),
-        ombro: safeParseFloat(formData.get('ombro')),
-        cintura: safeParseFloat(formData.get('cintura')),
-        quadril: safeParseFloat(formData.get('quadril')),
-        comprimento: safeParseFloat(formData.get('comprimento')),
-        manga: safeParseFloat(formData.get('manga')),
-        gancho: safeParseFloat(formData.get('gancho')),
-        comprimento_calca: safeParseFloat(formData.get('comprimento_calca'))
-    }
+    medida_busto: safeParseFloat(formData.get('busto')),
+    medida_ombro: safeParseFloat(formData.get('ombro')),
+    medida_manga: safeParseFloat(formData.get('manga')),
+    medida_comprimento: safeParseFloat(formData.get('comprimento')),
+    medida_cintura: safeParseFloat(formData.get('cintura')),
+    medida_quadril: safeParseFloat(formData.get('quadril')),
+    medida_gancho: safeParseFloat(formData.get('gancho')),
+    medida_comprimento_calca: safeParseFloat(formData.get('comprimento_calca')),
   };
 
   // Limpa chaves de medidas que não foram preenchidas

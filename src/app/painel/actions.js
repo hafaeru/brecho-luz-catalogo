@@ -15,29 +15,45 @@ function safeParseFloat(value) {
 
 // Extrai e converte os dados do formulário para o formato do banco de dados.
 function parseAndConvertFormData(formData) {
+  // CORREÇÃO: Os nomes dos campos (busto, ombro, etc.) agora batem com os 'name' dos inputs do formulário.
   const data = {
     nome: formData.get('nome'),
     categoria: formData.get('categoria'),
     tamanho: formData.get('tamanho'),
     marca: formData.get('marca'),
     cor: formData.get('cor'),
-    composicao_tecido: formData.get('composicao'), // Nome da coluna no DB
-    estado_conservacao: formData.get('estado'),   // Nome da coluna no DB
+    composicao_tecido: formData.get('composicao'),
+    estado_conservacao: formData.get('estado'),
     avarias: formData.get('avarias'),
     descricao: formData.get('descricao'),
     tags: formData.get('tags'),
     modelagem: formData.get('modelagem'),
     status: formData.get('status'),
     preco: safeParseFloat(formData.get('preco')),
-    medida_busto: safeParseFloat(formData.get('medida_busto')),
-    medida_ombro: safeParseFloat(formData.get('medida_ombro')),
-    medida_cintura: safeParseFloat(formData.get('medida_cintura')),
-    medida_quadril: safeParseFloat(formData.get('medida_quadril')),
-    medida_comprimento: safeParseFloat(formData.get('medida_comprimento')),
-    medida_manga: safeParseFloat(formData.get('medida_manga')),
-    medida_gancho: safeParseFloat(formData.get('medida_gancho')),
+    // Mapeamento de medidas para o JSON no banco de dados
+    medidas: {
+        busto: safeParseFloat(formData.get('busto')),
+        ombro: safeParseFloat(formData.get('ombro')),
+        cintura: safeParseFloat(formData.get('cintura')),
+        quadril: safeParseFloat(formData.get('quadril')),
+        comprimento: safeParseFloat(formData.get('comprimento')),
+        manga: safeParseFloat(formData.get('manga')),
+        gancho: safeParseFloat(formData.get('gancho')),
+        comprimento_calca: safeParseFloat(formData.get('comprimento_calca'))
+    }
   };
 
+  // Limpa chaves de medidas que não foram preenchidas
+  Object.keys(data.medidas).forEach(key => {
+    if (data.medidas[key] === null) {
+      delete data.medidas[key];
+    }
+  });
+  if (Object.keys(data.medidas).length === 0) {
+    delete data.medidas;
+  }
+
+  // Limpa chaves do objeto principal que são nulas ou vazias
   Object.keys(data).forEach(key => {
     if (data[key] === null || data[key] === undefined || data[key] === '') {
       delete data[key];
@@ -47,22 +63,22 @@ function parseAndConvertFormData(formData) {
   return data;
 }
 
-// A action agora aceita (state, formData) para compatibilidade com o hook useFormState.
-export async function createPiece(state, formData) {
+export async function createPiece(previousState, formData) {
   const supabase = await createClient();
   let imagePath = null;
 
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return { error: 'Usuário não autenticado. Faça o login para continuar.' };
+      return { message: 'Usuário não autenticado. Faça o login para continuar.' };
     }
 
     const pecaData = parseAndConvertFormData(formData);
-    const imagem = formData.get('foto_frente');
+    // CORREÇÃO: 'fotoFrente' bate com o 'name' do input de arquivo.
+    const imagem = formData.get('fotoFrente');
 
     if (!imagem || imagem.size === 0) {
-      return { error: 'A imagem da peça é obrigatória.' };
+      return { message: 'A imagem da peça é obrigatória.' };
     }
 
     const fileExtension = imagem.name.split('.').pop();
@@ -74,9 +90,12 @@ export async function createPiece(state, formData) {
       .upload(imagePath, imagem);
 
     if (imageError) throw imageError;
+    
+    // Obter a URL pública da imagem
+    const { data: { publicUrl } } = supabase.storage.from('fotos-pecas').getPublicUrl(imagePath);
 
-    pecaData.foto_frente_url = imageData.path;
-    pecaData.user_id = user.id; // Adiciona o user_id para satisfazer a RLS policy
+    pecaData.foto_frente_url = publicUrl; // Armazena a URL pública
+    pecaData.user_id = user.id;
 
     const { error: insertError } = await supabase.from('pecas').insert([pecaData]);
     if (insertError) throw insertError;
@@ -87,32 +106,30 @@ export async function createPiece(state, formData) {
       const supabase = await createClient();
       await supabase.storage.from('fotos-pecas').remove([imagePath]);
     }
-    return { error: error.message };
+    return { message: `Erro ao criar peça: ${error.message}` };
   }
 
   revalidatePath('/painel/catalogo');
   redirect('/painel/catalogo');
 }
 
-export async function updatePiece(state, formData) {
+export async function updatePiece(previousState, formData) {
   const supabase = await createClient();
   const id = formData.get('id');
-  if (!id) return { error: 'ID da peça não encontrado.' };
+  if (!id) return { message: 'ID da peça não encontrado.' };
 
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Usuário não autenticado.' };
+    if (!user) return { message: 'Usuário não autenticado.' };
     
     const dataToUpdate = parseAndConvertFormData(formData);
 
-    // Futuramente, adicionar lógica de atualização de imagem aqui.
-    
     const { error } = await supabase.from('pecas').update(dataToUpdate).eq('id', id);
     if (error) throw error;
 
   } catch (error) {
     console.error('Erro ao atualizar peça:', error);
-    return { error: 'Falha ao atualizar a peça no banco de dados.' };
+    return { message: 'Falha ao atualizar a peça no banco de dados.' };
   }
 
   revalidatePath('/painel/catalogo');

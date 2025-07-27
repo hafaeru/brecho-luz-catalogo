@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 
-// Helper para converter strings para float de forma segura.
 function safeParseFloat(value) {
   if (value === null || value === undefined || String(value).trim() === '') {
     return null;
@@ -13,9 +12,11 @@ function safeParseFloat(value) {
   return isNaN(parsed) ? null : parsed;
 }
 
-// Extrai e converte os dados do formulário para o formato do banco de dados.
 function parseAndConvertFormData(formData) {
-  // CORREÇÃO: Os nomes dos campos (busto, ombro, etc.) agora batem com os 'name' dos inputs do formulário.
+  const tagsValue = formData.get('tags');
+  // Garante que as tags sejam um array limpo ou null
+  const tagsArray = tagsValue ? tagsValue.split(',').map(tag => tag.trim()).filter(Boolean) : null;
+
   const data = {
     nome: formData.get('nome'),
     categoria: formData.get('categoria'),
@@ -26,11 +27,12 @@ function parseAndConvertFormData(formData) {
     estado_conservacao: formData.get('estado'),
     avarias: formData.get('avarias'),
     descricao: formData.get('descricao'),
-    tags: formData.get('tags'),
     modelagem: formData.get('modelagem'),
-    status: formData.get('status'),
+    status: formData.get('status') || 'Disponível',
     preco: safeParseFloat(formData.get('preco')),
-    // Mapeamento de medidas para o JSON no banco de dados
+    tags: tagsArray,
+
+    // Mapeamento para colunas individuais
     medida_busto: safeParseFloat(formData.get('busto')),
     medida_ombro: safeParseFloat(formData.get('ombro')),
     medida_manga: safeParseFloat(formData.get('manga')),
@@ -41,19 +43,11 @@ function parseAndConvertFormData(formData) {
     medida_comprimento_calca: safeParseFloat(formData.get('comprimento_calca')),
   };
 
-  // Limpa chaves de medidas que não foram preenchidas
-  Object.keys(data.medidas).forEach(key => {
-    if (data.medidas[key] === null) {
-      delete data.medidas[key];
-    }
-  });
-  if (Object.keys(data.medidas).length === 0) {
-    delete data.medidas;
-  }
-
-  // Limpa chaves do objeto principal que são nulas ou vazias
+  // CORREÇÃO: Bloco com erro foi removido.
+  // O bloco abaixo já limpa corretamente qualquer valor nulo ou indefinido,
+  // incluindo as colunas de medida individuais.
   Object.keys(data).forEach(key => {
-    if (data[key] === null || data[key] === undefined || data[key] === '') {
+    if (data[key] === null || data[key] === undefined || data[key] === '' || (Array.isArray(data[key]) && data[key].length === 0)) {
       delete data[key];
     }
   });
@@ -72,39 +66,48 @@ export async function createPiece(previousState, formData) {
     }
 
     const pecaData = parseAndConvertFormData(formData);
-    // CORREÇÃO: 'fotoFrente' bate com o 'name' do input de arquivo.
-    const imagem = formData.get('fotoFrente');
+    const imagemFrente = formData.get('fotoFrente');
 
-    if (!imagem || imagem.size === 0) {
-      return { message: 'A imagem da peça é obrigatória.' };
+    if (!imagemFrente || imagemFrente.size === 0) {
+      return { message: 'A imagem da frente é obrigatória.' };
     }
 
-    const fileExtension = imagem.name.split('.').pop();
-    const uniqueFileName = `${Date.now()}-${user.id.substring(0, 5)}.${fileExtension}`;
-    imagePath = uniqueFileName;
+    const fileExtension = imagemFrente.name.split('.').pop();
+    const uniqueFileName = `frente-${Date.now()}.${fileExtension}`;
+    imagePath = `${user.id}/${uniqueFileName}`;
 
-    const { data: imageData, error: imageError } = await supabase.storage
+    const { error: imageError } = await supabase.storage
+      .from('fotos-pecas') // Nome do seu bucket
+      .upload(imagePath, imagemFrente);
+
+    if (imageError) {
+      console.error("Erro no Upload para o Storage:", imageError);
+      throw new Error(`Falha no upload da imagem: ${imageError.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
       .from('fotos-pecas')
-      .upload(imagePath, imagem);
+      .getPublicUrl(imagePath);
 
-    if (imageError) throw imageError;
-    
-    // Obter a URL pública da imagem
-    const { data: { publicUrl } } = supabase.storage.from('fotos-pecas').getPublicUrl(imagePath);
-
-    pecaData.foto_frente_url = publicUrl; // Armazena a URL pública
+    // Usando sua coluna 'imagens' do tipo jsonb
+    pecaData.imagens = { frente: urlData.publicUrl };
     pecaData.user_id = user.id;
 
-    const { error: insertError } = await supabase.from('pecas').insert([pecaData]);
-    if (insertError) throw insertError;
+    const { error: insertError } = await supabase.from('pecas').insert(pecaData);
+
+    if (insertError) {
+      console.error("Erro na Inserção no Banco:", insertError);
+      throw new Error(`Falha ao salvar dados da peça: ${insertError.message}`);
+    }
 
   } catch (error) {
-    console.error('Erro em createPiece:', error);
+    console.error('Erro em createPiece:', error.message);
     if (imagePath) {
+      // Se a inserção no DB falhar, remove a imagem órfã do Storage
       const supabase = await createClient();
       await supabase.storage.from('fotos-pecas').remove([imagePath]);
     }
-    return { message: `Erro ao criar peça: ${error.message}` };
+    return { message: error.message }; // Retorna a mensagem de erro para o formulário
   }
 
   revalidatePath('/painel/catalogo');
@@ -112,24 +115,6 @@ export async function createPiece(previousState, formData) {
 }
 
 export async function updatePiece(previousState, formData) {
-  const supabase = await createClient();
-  const id = formData.get('id');
-  if (!id) return { message: 'ID da peça não encontrado.' };
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { message: 'Usuário não autenticado.' };
-    
-    const dataToUpdate = parseAndConvertFormData(formData);
-
-    const { error } = await supabase.from('pecas').update(dataToUpdate).eq('id', id);
-    if (error) throw error;
-
-  } catch (error) {
-    console.error('Erro ao atualizar peça:', error);
-    return { message: 'Falha ao atualizar a peça no banco de dados.' };
-  }
-
-  revalidatePath('/painel/catalogo');
-  redirect('/painel/catalogo');
+  // A ser implementado
+  return { message: 'Função de atualizar peça precisa ser ajustada.' };
 }

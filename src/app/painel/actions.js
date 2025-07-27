@@ -1,109 +1,120 @@
 'use server';
 
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 
-const supabase = createServerComponentClient({ cookies });
-
-function parseFormData(formData) {
-  const campos = [
-    'nome', 'categoria', 'preco', 'tamanho', 'marca', 'cor', 'composicao',
-    'estado', 'avarias', 'descricao', 'tags', 'modelagem', 'status',
-    'medida_busto', 'medida_ombro', 'medida_cintura', 'medida_quadril', 'medida_comprimento',
-    'foto_frente_url'
-  ];
-
-  const data = {};
-  for (const campo of campos) {
-    data[campo] = formData.get(campo);
+// Helper para converter strings para float de forma segura.
+function safeParseFloat(value) {
+  if (value === null || value === undefined || String(value).trim() === '') {
+    return null;
   }
+  const parsed = parseFloat(String(value).replace(',', '.'));
+  return isNaN(parsed) ? null : parsed;
+}
+
+// Extrai e converte os dados do formulário para o formato do banco de dados.
+function parseAndConvertFormData(formData) {
+  const data = {
+    nome: formData.get('nome'),
+    categoria: formData.get('categoria'),
+    tamanho: formData.get('tamanho'),
+    marca: formData.get('marca'),
+    cor: formData.get('cor'),
+    composicao_tecido: formData.get('composicao'), // Nome da coluna no DB
+    estado_conservacao: formData.get('estado'),   // Nome da coluna no DB
+    avarias: formData.get('avarias'),
+    descricao: formData.get('descricao'),
+    tags: formData.get('tags'),
+    modelagem: formData.get('modelagem'),
+    status: formData.get('status'),
+    preco: safeParseFloat(formData.get('preco')),
+    medida_busto: safeParseFloat(formData.get('medida_busto')),
+    medida_ombro: safeParseFloat(formData.get('medida_ombro')),
+    medida_cintura: safeParseFloat(formData.get('medida_cintura')),
+    medida_quadril: safeParseFloat(formData.get('medida_quadril')),
+    medida_comprimento: safeParseFloat(formData.get('medida_comprimento')),
+    medida_manga: safeParseFloat(formData.get('medida_manga')),
+    medida_gancho: safeParseFloat(formData.get('medida_gancho')),
+  };
+
+  Object.keys(data).forEach(key => {
+    if (data[key] === null || data[key] === undefined || data[key] === '') {
+      delete data[key];
+    }
+  });
 
   return data;
 }
 
-// ✅ Agora recebe FormData e transforma em objeto para o Supabase
-export async function createPiece(formData) {
-  const pecaData = parseFormData(formData);
+// A action agora aceita (state, formData) para compatibilidade com o hook useFormState.
+export async function createPiece(state, formData) {
+  const supabase = await createClient();
+  let imagePath = null;
 
   try {
-    const { error } = await supabase.from('pecas').insert([pecaData]);
-    if (error) throw error;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { error: 'Usuário não autenticado. Faça o login para continuar.' };
+    }
+
+    const pecaData = parseAndConvertFormData(formData);
+    const imagem = formData.get('foto_frente');
+
+    if (!imagem || imagem.size === 0) {
+      return { error: 'A imagem da peça é obrigatória.' };
+    }
+
+    const fileExtension = imagem.name.split('.').pop();
+    const uniqueFileName = `${Date.now()}-${user.id.substring(0, 5)}.${fileExtension}`;
+    imagePath = uniqueFileName;
+
+    const { data: imageData, error: imageError } = await supabase.storage
+      .from('fotos-pecas')
+      .upload(imagePath, imagem);
+
+    if (imageError) throw imageError;
+
+    pecaData.foto_frente_url = imageData.path;
+    pecaData.user_id = user.id; // Adiciona o user_id para satisfazer a RLS policy
+
+    const { error: insertError } = await supabase.from('pecas').insert([pecaData]);
+    if (insertError) throw insertError;
+
   } catch (error) {
-    console.error('Erro ao criar peça:', error);
-    return { error: 'Falha ao criar a peça no banco de dados.' };
+    console.error('Erro em createPiece:', error);
+    if (imagePath) {
+      const supabase = await createClient();
+      await supabase.storage.from('fotos-pecas').remove([imagePath]);
+    }
+    return { error: error.message };
   }
 
-  revalidatePath('/');
   revalidatePath('/painel/catalogo');
   redirect('/painel/catalogo');
 }
 
-export async function updatePiece(formData) {
+export async function updatePiece(state, formData) {
+  const supabase = await createClient();
   const id = formData.get('id');
-  const dataToUpdate = parseFormData(formData);
+  if (!id) return { error: 'ID da peça não encontrado.' };
 
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'Usuário não autenticado.' };
+    
+    const dataToUpdate = parseAndConvertFormData(formData);
+
+    // Futuramente, adicionar lógica de atualização de imagem aqui.
+    
     const { error } = await supabase.from('pecas').update(dataToUpdate).eq('id', id);
     if (error) throw error;
+
   } catch (error) {
     console.error('Erro ao atualizar peça:', error);
     return { error: 'Falha ao atualizar a peça no banco de dados.' };
   }
 
-  revalidatePath('/');
-  revalidatePath('/painel/catalogo');
-  redirect('/painel/catalogo');
-}
-
-export async function deletePiece(formData) {
-  const id = formData.get('id');
-  try {
-    const { data: peca, error: fetchError } = await supabase
-      .from('pecas')
-      .select('imagens')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    if (peca.imagens && peca.imagens.length > 0) {
-      const filePaths = peca.imagens.map((url) =>
-        url.substring(url.lastIndexOf('/') + 1)
-      );
-      if (filePaths.length > 0) {
-        await supabase.storage.from('fotos-pecas').remove(filePaths);
-      }
-    }
-
-    const { error: deleteError } = await supabase.from('pecas').delete().eq('id', id);
-    if (deleteError) throw deleteError;
-  } catch (error) {
-    console.error('Erro ao deletar peça:', error);
-  }
-
-  revalidatePath('/');
-  revalidatePath('/painel/catalogo');
-  redirect('/painel/catalogo');
-}
-
-export async function updatePieceStatus(formData) {
-  const id = formData.get('id');
-  const newStatus = formData.get('status');
-
-  try {
-    const { error } = await supabase
-      .from('pecas')
-      .update({ status: newStatus })
-      .eq('id', id);
-
-    if (error) throw error;
-  } catch (error) {
-    console.error('Erro ao atualizar status da peça:', error);
-  }
-
-  revalidatePath('/');
   revalidatePath('/painel/catalogo');
   redirect('/painel/catalogo');
 }

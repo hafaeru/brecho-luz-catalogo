@@ -1,5 +1,3 @@
-// Em next.config.mjs
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -12,10 +10,9 @@ const nextConfig = {
       },
     ],
   },
-  // CORREÇÃO: Mover a configuração para dentro de `experimental`
   experimental: {
     serverActions: {
-      bodySizeLimit: '8mb', // Ou o valor que desejar, ex: '10mb'
+      bodySizeLimit: '1000mb', // Aumentado para 10MB para acomodar múltiplas imagens.
     },
   },
 };

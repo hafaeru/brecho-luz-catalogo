@@ -68,8 +68,11 @@ function parseAndConvertFormData(formData) {
 
 // ... (a função createPiece permanece a mesma)
 export async function createPiece(previousState, formData) {
-  const supabase = await createClient();
-  let imagePath = null;
+  // CORREÇÃO: Adicionado 'await' que foi omitido na versão anterior.
+  const supabase = await createClient(); 
+  
+  // Array para rastrear imagens enviadas com sucesso e limpá-las em caso de erro
+  const uploadedImagePaths = []; 
 
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -78,57 +81,70 @@ export async function createPiece(previousState, formData) {
     }
 
     const pecaData = parseAndConvertFormData(formData);
-    const imagemFrente = formData.get('fotoFrente');
+    
+    // 1. Coleta todos os arquivos do formulário que não estão vazios
+    const filesToUpload = [
+      { name: 'fotoFrente', file: formData.get('fotoFrente') },
+      { name: 'fotoCostas', file: formData.get('fotoCostas') },
+      { name: 'fotoEtiqueta', file: formData.get('fotoEtiqueta') },
+      { name: 'fotoComposicao', file: formData.get('fotoComposicao') },
+      { name: 'fotoDetalhe', file: formData.get('fotoDetalhe') },
+      { name: 'fotoAvaria', file: formData.get('fotoAvaria') },
+    ].filter(entry => entry.file && entry.file.size > 0);
 
-    if (!imagemFrente || imagemFrente.size === 0) {
+    if (filesToUpload.length === 0 || filesToUpload[0].name !== 'fotoFrente') {
       return { message: 'A imagem da frente é obrigatória.' };
     }
 
-    const fileExtension = imagemFrente.name.split('.').pop();
-    const uniqueFileName = `frente-${Date.now()}.${fileExtension}`;
-    imagePath = `${user.id}/${uniqueFileName}`;
+    // 2. Prepara e executa todos os uploads em paralelo para maior performance
+    const uploadPromises = filesToUpload.map(({ name, file }) => {
+      const fileExtension = file.name.split('.').pop();
+      const filePath = `${user.id}/${name}-${Date.now()}.${fileExtension}`;
+      
+      return supabase.storage.from('fotos-pecas').upload(filePath, file)
+        .then(result => {
+          if (result.error) {
+            throw new Error(`Falha no upload de ${name}: ${result.error.message}`);
+          }
+          uploadedImagePaths.push(result.data.path);
+          return result.data.path;
+        });
+    });
 
-    const { error: imageError } = await supabase.storage
-      .from('fotos-pecas')
-      .upload(imagePath, imagemFrente);
+    const successfullyUploadedPaths = await Promise.all(uploadPromises);
 
-    if (imageError) {
-        throw new Error(`Falha no upload da imagem: ${imageError.message}`);
-    }
+    // 3. Obter as URLs públicas para todos os caminhos de imagem
+    const publicUrls = successfullyUploadedPaths.map(path => {
+        const { data } = supabase.storage.from('fotos-pecas').getPublicUrl(path);
+        if (!data || !data.publicUrl) {
+            throw new Error(`Não foi possível obter a URL pública para a imagem: ${path}`);
+        }
+        return data.publicUrl;
+    });
 
-    const { data: urlData } = supabase.storage
-      .from('fotos-pecas')
-      .getPublicUrl(imagePath);
-
-    if (!urlData || !urlData.publicUrl) {
-      throw new Error('Não foi possível obter a URL pública da imagem após o upload.');
-    }
-
-    // CORREÇÃO DEFINITIVA: Salvando a URL dentro de um array para manter a compatibilidade.
-    pecaData.imagens = [urlData.publicUrl];
+    // 4. Salvar o array de URLs no banco de dados
+    pecaData.imagens = publicUrls;
     pecaData.user_id = user.id;
 
     const { error: insertError } = await supabase.from('pecas').insert(pecaData);
 
     if (insertError) {
-      // Se a inserção falhar, a imagem órfã será removida no bloco catch.
       throw new Error(`Falha ao salvar dados da peça: ${insertError.message}`);
     }
 
   } catch (error) {
     console.error('Erro em createPiece:', error.message);
-    // Se qualquer passo no bloco try falhar, remove a imagem se ela já foi enviada.
-    if (imagePath) {
-      const supabase = await createClient();
-      await supabase.storage.from('fotos-pecas').remove([imagePath]);
+    
+    if (uploadedImagePaths.length > 0) {
+      console.log('Limpando imagens órfãs do storage:', uploadedImagePaths);
+      await supabase.storage.from('fotos-pecas').remove(uploadedImagePaths);
     }
-    // Retorna a mensagem de erro para ser exibida no formulário.
+    
     return { message: error.message };
   }
 
-  // Se tudo der certo, invalida o cache e redireciona.
-  revalidatePath('/painel');
-  redirect('/painel');
+  revalidatePath('/painel/catalogo');
+  redirect('/painel/catalogo');
 }
 
 

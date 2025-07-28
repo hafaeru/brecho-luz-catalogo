@@ -199,47 +199,74 @@ export async function deletePiece(formData) {
   }
 }
 
-// --- NOVA FUNÇÃO ---
-export async function updatePiece(previousState, formData) {
+// --- FUNÇÃO DE ATUALIZAÇÃO CORRIGIDA ---
+export async function updatePiece(id, formData) {
   const supabase = await createClient();
-  const id = formData.get('id');
+  const uploadedImagePaths = [];
 
-  if (!id) {
-    return { message: 'ID da peça não foi encontrado no formulário.' };
-  }
+  if (!id) return { message: 'ID da peça não fornecido.' };
 
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return { message: 'Usuário não autenticado.' };
+    if (!user) return { message: 'Usuário não autenticado.' };
+
+    const updatedData = parseAndConvertFormData(formData);
+
+    // Upload de novas imagens se fornecidas
+    const filesToUpload = [
+      { name: 'fotoFrente', file: formData.get('fotoFrente') },
+      { name: 'fotoCostas', file: formData.get('fotoCostas') },
+      { name: 'fotoEtiqueta', file: formData.get('fotoEtiqueta') },
+      { name: 'fotoComposicao', file: formData.get('fotoComposicao') },
+      { name: 'fotoDetalhe', file: formData.get('fotoDetalhe') },
+      { name: 'fotoAvaria', file: formData.get('fotoAvaria') },
+    ].filter(entry => entry.file && entry.file.size > 0);
+
+    if (filesToUpload.length > 0) {
+      const uploadPromises = filesToUpload.map(({ name, file }) => {
+        const ext = file.name.split('.').pop();
+        const filePath = `${user.id}/${name}-${Date.now()}.${ext}`;
+
+        return supabase.storage.from('fotos-pecas').upload(filePath, file)
+          .then(result => {
+            if (result.error) throw new Error(`Erro ao enviar ${name}: ${result.error.message}`);
+            uploadedImagePaths.push(result.data.path);
+            return result.data.path;
+          });
+      });
+
+      const newPaths = await Promise.all(uploadPromises);
+
+      const publicUrls = newPaths.map(path => {
+        const { data } = supabase.storage.from('fotos-pecas').getPublicUrl(path);
+        if (!data?.publicUrl) throw new Error(`Erro ao obter URL pública de ${path}`);
+        return data.publicUrl;
+      });
+
+      updatedData.imagens = publicUrls;
     }
 
-    // Reutiliza a mesma função de parsing para obter os dados atualizados
-    const dataToUpdate = parseAndConvertFormData(formData);
-    
-    // Nota: Esta versão atualiza os dados de texto/números.
-    // A lógica para adicionar/remover/alterar fotos pode ser implementada aqui no futuro.
-
+    // Atualiza no banco
     const { error } = await supabase
       .from('pecas')
-      .update(dataToUpdate)
+      .update(updatedData)
       .eq('id', id)
-      .eq('user_id', user.id); // Garante que o usuário só pode editar suas próprias peças
+      .eq('user_id', user.id);
 
-    if (error) {
-      console.error("Erro ao atualizar a peça:", error);
-      throw new Error(`Falha ao atualizar dados da peça: ${error.message}`);
-    }
+    if (error) throw new Error(`Falha ao atualizar peça: ${error.message}`);
 
-    // Invalida o cache das páginas relevantes para que a mudança seja refletida
-    revalidatePath('/painel');
+    revalidatePath('/painel/catalogo');
     revalidatePath(`/peca/${id}`);
     revalidatePath(`/painel/editar/${id}`);
+    redirect('/painel/catalogo');
 
   } catch (error) {
+    console.error('Erro ao atualizar peça:', error);
+
+    if (uploadedImagePaths.length > 0) {
+      await supabase.storage.from('fotos-pecas').remove(uploadedImagePaths);
+    }
+
     return { message: error.message };
   }
-  
-  // Redireciona de volta para o catálogo após a edição bem-sucedida
-  redirect('/painel');
 }

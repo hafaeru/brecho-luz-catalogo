@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+// Linha Correta
+import { createPiece, updatePiece } from './actions.js';
 
 
 export default function AddPieceForm({ pecaInicial }) {

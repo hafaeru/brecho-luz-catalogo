@@ -5,6 +5,8 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 // Linha Correta
 import { createPiece, updatePiece } from './actions.js';
+import imageCompression from 'browser-image-compression';
+
 
 
 export default function AddPieceForm({ pecaInicial }) {
@@ -93,17 +95,40 @@ export default function AddPieceForm({ pecaInicial }) {
     if (!pecaInicial) {
       const fotosParaUpload = [fotoFrente, fotoCostas, fotoEtiqueta, fotoComposicao, fotoDetalhe, fotoAvaria].filter(Boolean);
 
-      const uploadPromises = fotosParaUpload.map(async (file) => {
-        const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '');
-        const fileName = `${Date.now()}-${cleanFileName}`;
-        const { data, error: uploadError } = await supabase.storage.from('fotos-pecas').upload(fileName, file);
-        if (uploadError) {
-          // Se o upload falhar, joga um erro específico para ser capturado pelo catch.
-          throw new Error(`Falha no upload da imagem para o Supabase: ${uploadError.message}`);
-        }
-        const { data: urlData } = supabase.storage.from('fotos-pecas').getPublicUrl(data.path);
-        return urlData.publicUrl;
-      });
+        const uploadPromises = fotosParaUpload.map(async (file) => {
+  // Configurações da compressão
+  const options = {
+    maxSizeMB: 1, // Máx. ~1MB
+    maxWidthOrHeight: 1920, // Reduz resolução mantendo proporção
+    useWebWorker: true // Processa em thread separada
+  };
+
+  // Comprime a imagem antes de enviar
+  const compressedFile = await imageCompression(file, options);
+
+  // Gera um nome de arquivo limpo e único
+  const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '');
+  const fileName = `${Date.now()}-${cleanFileName}`;
+
+  // Faz o upload da imagem comprimida para o Supabase
+  const { data, error: uploadError } = await supabase
+    .storage
+    .from('fotos-pecas')
+    .upload(fileName, compressedFile);
+
+  if (uploadError) {
+    throw new Error(`Falha no upload da imagem para o Supabase: ${uploadError.message}`);
+  }
+
+  // Obtém a URL pública da imagem
+  const { data: urlData } = supabase
+    .storage
+    .from('fotos-pecas')
+    .getPublicUrl(data.path);
+
+  return urlData.publicUrl;
+        });
+
       fotoUrls = await Promise.all(uploadPromises);
     }
     

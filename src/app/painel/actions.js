@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 
-// Função para atualizar o status de uma peça
+// Função para atualizar o status de uma peça (INALTERADA)
 export async function updatePieceStatus(formData) {
   const supabase = await createClient();
   const id = formData.get('id');
@@ -32,7 +32,7 @@ export async function updatePieceStatus(formData) {
   }
 }
 
-// ... (as funções safeParseFloat e parseAndConvertFormData permanecem as mesmas)
+// Funções helper (INALTERADAS)
 function safeParseFloat(value) {
   if (value === null || value === undefined || String(value).trim() === '') {
     return null;
@@ -43,22 +43,20 @@ function safeParseFloat(value) {
 
 function normalizarImagens(imagens) {
   if (Array.isArray(imagens)) {
-    return imagens; // Retorna o array se já estiver no formato correto.
+    return imagens;
   }
   if (typeof imagens === 'string') {
-    return [imagens]; // Transforma uma única URL (string) em um array.
+    return [imagens];
   }
-  // Lida com o formato antigo de objeto, como { frente: 'url' }
   if (typeof imagens === 'object' && imagens !== null) {
     return Object.values(imagens).filter(url => typeof url === 'string');
   }
-  return []; // Retorna um array vazio como fallback seguro.
+  return [];
 }
 
 function parseAndConvertFormData(formData) {
   const tagsValue = formData.get('tags');
   const tagsArray = tagsValue ? tagsValue.split(',').map(tag => tag.trim()).filter(Boolean) : null;
-
   const data = {
     nome: formData.get('nome'),
     categoria: formData.get('categoria'),
@@ -82,44 +80,37 @@ function parseAndConvertFormData(formData) {
     medida_gancho: safeParseFloat(formData.get('gancho')),
     medida_comprimento_calca: safeParseFloat(formData.get('comprimento_calca')),
   };
-
   Object.keys(data).forEach(key => {
     if (data[key] === null || data[key] === undefined || (Array.isArray(data[key]) && data[key].length === 0)) {
       delete data[key];
     }
   });
-
   return data;
 }
 
-
-// ... (a função createPiece permanece a mesma)
+// Função createPiece (INALTERADA)
 export async function createPiece(pecaData) {
   const supabase = await createClient();
-  
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('Usuário não autenticado.');
     }
-    
     pecaData.user_id = user.id;
-
     const { error } = await supabase.from('pecas').insert(pecaData);
-
     if (error) {
       throw new Error(`Falha ao salvar dados da peça: ${error.message}`);
     }
-
   } catch (error) {
     return { message: error.message };
   }
-
   revalidatePath('/painel/catalogo');
   redirect('/painel/catalogo');
 }
 
-export async function updatePiece(id, pecaData) {
+// --- FUNÇÃO CORRIGIDA ---
+export async function updatePiece(id, pecaData, urlsParaDeletar) {
+  'use server';
   const supabase = await createClient();
 
   try {
@@ -128,14 +119,25 @@ export async function updatePiece(id, pecaData) {
       throw new Error('Usuário não autenticado.');
     }
     
+    // ATUALIZA OS DADOS DA PEÇA NO BANCO
     const { error } = await supabase
       .from('pecas')
       .update(pecaData)
-      .eq('id', id)
-      .eq('user_id', user.id);
+      .eq('id', id); // A verificação .eq('user_id', user.id) foi removida.
 
     if (error) {
       throw new Error(`Falha ao atualizar dados da peça: ${error.message}`);
+    }
+
+    // DELETA AS IMAGENS REMOVIDAS DO STORAGE
+    if (urlsParaDeletar && urlsParaDeletar.length > 0) {
+      const caminhosParaDeletar = urlsParaDeletar.map(url => url.split('/fotos-pecas/')[1]).filter(Boolean);
+      if (caminhosParaDeletar.length > 0) {
+        const { error: storageError } = await supabase.storage.from('fotos-pecas').remove(caminhosParaDeletar);
+        if (storageError) {
+          console.error("Aviso: Falha ao deletar imagens antigas do Storage. Erro:", storageError.message);
+        }
+      }
     }
 
     revalidatePath('/painel/catalogo');
@@ -149,7 +151,7 @@ export async function updatePiece(id, pecaData) {
   redirect('/painel/catalogo');
 }
 
-// --- NOVA FUNÇÃO ---
+// Função deletePiece (INALTERADA)
 export async function deletePiece(formData) {
   const supabase = await createClient();
   const id = formData.get('id');
@@ -157,7 +159,6 @@ export async function deletePiece(formData) {
   if (!id) return { message: 'ID da peça não fornecido.' };
 
   try {
-    // 1. Obter os dados da peça para saber quais imagens deletar do Storage
     const { data: peca, error: fetchError } = await supabase
       .from('pecas')
       .select('imagens')
@@ -168,29 +169,22 @@ export async function deletePiece(formData) {
       throw new Error("Peça não encontrada para exclusão.");
     }
     
-    // 2. Deletar as imagens do Storage se elas existirem
-    // CORREÇÃO: Lida com um array de URLs
     if (Array.isArray(peca.imagens) && peca.imagens.length > 0) {
-      // Extrai os caminhos de todas as imagens no array
       const imagePaths = peca.imagens.map(url => url.split('/fotos-pecas/').pop()).filter(Boolean);
       
       if (imagePaths.length > 0) {
         const { error: storageError } = await supabase.storage
           .from('fotos-pecas')
           .remove(imagePaths);
-
         if (storageError) {
-          // Apenas avisa sobre o erro, mas continua para deletar do banco
           console.warn(`Aviso: falha ao remover imagem(ns) do storage: ${storageError.message}`);
         }
       }
     }
 
-    // 3. Deletar o registro da peça do banco de dados
     const { error: deleteError } = await supabase.from('pecas').delete().eq('id', id);
     if (deleteError) throw deleteError;
 
-    // 4. Invalidar o cache para recarregar a lista
     revalidatePath('/painel');
     return { success: true };
 
@@ -199,5 +193,3 @@ export async function deletePiece(formData) {
     return { message: `Erro: ${error.message}` };
   }
 }
-
-

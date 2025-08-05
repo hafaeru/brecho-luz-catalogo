@@ -151,15 +151,15 @@ export default function Home() {
     <div key={peca.id} className="border border-rose-200 rounded-lg shadow-sm flex flex-col bg-amber-100 overflow-hidden">
       
       {/* Link envolvendo a imagem, que agora ocupa toda a largura */}
-      <Link href={`/peca/${peca.id}`}>
-        <Image 
-          src={peca.imagens?.[0]} 
-          alt={peca.nome} 
-          width={400} 
-          height={400} 
-          className="w-full h-auto object-cover " // aspect-square para manter a imagem quadrada
-        />
-      </Link>
+       <Link href={`/peca/${peca.id}`} className="block aspect-[3/4] w-full">
+     <Image
+    src={peca.imagens?.[0]}
+    alt={peca.nome}
+    width={400}
+    height={533} // Ajuste a altura proporcionalmente (400 * 4 / 3)
+    className="w-full h-full object-contain"
+       />
+       </Link>
       
       {/* 3. Nova div criada para conter o texto, com seu próprio padding e alinhamento. */}
       <div className="p-3 text-center">

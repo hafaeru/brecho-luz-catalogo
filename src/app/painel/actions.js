@@ -5,6 +5,33 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 
+// Função para atualizar o status de uma peça
+export async function updatePieceStatus(formData) {
+  const supabase = await createClient();
+  const id = formData.get('id');
+  const status = formData.get('status');
+
+  if (!id || !status) {
+    return { message: 'ID ou status não fornecido.' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('pecas')
+      .update({ status })
+      .eq('id', id);
+
+    if (error) throw new Error(`Falha ao atualizar status: ${error.message}`);
+    
+    revalidatePath('/painel/catalogo');
+    revalidatePath(`/peca/${id}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Erro ao atualizar status:", error);
+    return { message: `Erro: ${error.message}` };
+  }
+}
+
 // ... (as funções safeParseFloat e parseAndConvertFormData permanecem as mesmas)
 function safeParseFloat(value) {
   if (value === null || value === undefined || String(value).trim() === '') {

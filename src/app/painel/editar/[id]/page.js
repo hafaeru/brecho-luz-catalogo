@@ -5,7 +5,8 @@ import Link from 'next/link';
 
 // Função para buscar os dados de uma peça específica
 async function getPeca(id) {
-  const supabase = createServerComponentClient({ cookies });
+  const cookieStore = cookies();
+  const supabase = createServerComponentClient({ cookies: cookieStore });
   const { data, error } = await supabase
     .from('pecas')
     .select('*')

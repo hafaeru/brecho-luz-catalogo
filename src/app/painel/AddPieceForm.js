@@ -75,64 +75,76 @@ export default function AddPieceForm({ pecaInicial }) {
   };
 
   // Lógica de submissão que faz o upload no cliente
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!pecaInicial && !fotoFrente) {
-      setError('A foto da frente é obrigatória.');
-      return;
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!pecaInicial && !fotoFrente) {
+    setError('A foto da frente é obrigatória.');
+    return;
+  }
+  setLoading(true);
+  setError('');
+  setMessage('');
+
+  try {
+    let fotoUrls = pecaInicial ? pecaInicial.imagens || [] : [];
+
+    // 1. O upload das imagens no cliente (sua lógica original, que está correta)
+    // só é executado se for uma peça nova.
+    if (!pecaInicial) {
+      const fotosParaUpload = [fotoFrente, fotoCostas, fotoEtiqueta, fotoComposicao, fotoDetalhe, fotoAvaria].filter(Boolean);
+
+      const uploadPromises = fotosParaUpload.map(async (file) => {
+        const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '');
+        const fileName = `${Date.now()}-${cleanFileName}`;
+        const { data, error: uploadError } = await supabase.storage.from('fotos-pecas').upload(fileName, file);
+        if (uploadError) {
+          // Se o upload falhar, joga um erro específico para ser capturado pelo catch.
+          throw new Error(`Falha no upload da imagem para o Supabase: ${uploadError.message}`);
+        }
+        const { data: urlData } = supabase.storage.from('fotos-pecas').getPublicUrl(data.path);
+        return urlData.publicUrl;
+      });
+      fotoUrls = await Promise.all(uploadPromises);
     }
-    setLoading(true);
-    setError('');
-    setMessage('');
+    
+    // 2. Prepara um objeto APENAS com os dados de texto e as URLs das imagens.
+    const pecaData = {
+      nome, categoria, status,
+      preco: parseFloat(String(preco).replace(',', '.')) || null,
+      tamanho, marca, cor, modelagem,
+      composicao_tecido: composicao,
+      estado_conservacao: estado,
+      avarias, descricao, 
+      tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      medida_busto: parseFloat(medidas.busto) || null,
+      medida_ombro: parseFloat(medidas.ombro) || null,
+      medida_manga: parseFloat(medidas.manga) || null,
+      medida_cintura: parseFloat(medidas.cintura) || null,
+      medida_quadril: parseFloat(medidas.quadril) || null,
+      medida_gancho: parseFloat(medidas.gancho) || null,
+      medida_comprimento: parseFloat(medidas.comprimento) || parseFloat(medidas.comprimento_calca) || null,
+      // Garante que as imagens sejam incluídas no objeto
+      imagens: fotoUrls 
+    };
 
-    try {
-      let fotoUrls = pecaInicial ? pecaInicial.imagens || [] : [];
-
-      if (!pecaInicial) {
-        const fotosParaUpload = [fotoFrente, fotoCostas, fotoEtiqueta, fotoComposicao, fotoDetalhe, fotoAvaria].filter(Boolean);
-
-        const uploadPromises = fotosParaUpload.map(async (file) => {
-          const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '');
-          const fileName = `${Date.now()}-${cleanFileName}`;
-          const { data, error: uploadError } = await supabase.storage.from('fotos-pecas').upload(fileName, file);
-          if (uploadError) throw uploadError;
-          const { data: urlData } = supabase.storage.from('fotos-pecas').getPublicUrl(data.path);
-          return urlData.publicUrl;
-        });
-        fotoUrls = await Promise.all(uploadPromises);
-      }
-      
-      const pecaData = {
-        nome, categoria, preco, tamanho, marca, cor, modelagem,
-        composicao_tecido: composicao, estado_conservacao: estado,
-        avarias, descricao, tags, status,
-        // CORREÇÃO: Mapeia do estado 'medidas' para as colunas do DB
-        medida_busto: medidas.busto || null,
-        medida_ombro: medidas.ombro || null,
-        medida_manga: medidas.manga || null,
-        medida_cintura: medidas.cintura || null,
-        medida_quadril: medidas.quadril || null,
-        medida_gancho: medidas.gancho || null,
-        medida_comprimento: medidas.comprimento || medidas.comprimento_calca || null,
-      };
-
-      if (pecaInicial) {
-        await updatePiece(pecaInicial.id, pecaData);
-      } else {
-        pecaData.imagens = fotoUrls;
-        await createPiece(pecaData);
-      }
-
-      setMessage('Peça salva com sucesso!');
-      router.push('/painel/catalogo');
-      
-    } catch (err) {
-      console.error('Erro no processo:', err);
-      setError('Ocorreu um erro ao salvar a peça: ' + err.message);
-    } finally {
-      setLoading(false);
+    // 3. Chama a Server Action apropriada, passando o objeto de dados leve.
+    if (pecaInicial) {
+      await updatePiece(pecaInicial.id, pecaData);
+    } else {
+      await createPiece(pecaData);
     }
-  };
+
+    setMessage('Peça salva com sucesso!');
+    router.push('/painel/catalogo');
+    
+  } catch (err) {
+    // Esta mensagem de erro agora será mais clara se o problema for no upload.
+    console.error('Erro no processo de salvamento:', err);
+    setError(`Ocorreu um erro ao salvar a peça: ${err.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Lógica para renderizar campos de medida dinâmicos (Sua lógica original)
   const MedidasFields = useMemo(() => {

@@ -67,79 +67,24 @@ function parseAndConvertFormData(formData) {
 
 
 // ... (a função createPiece permanece a mesma)
-export async function createPiece(previousState, formData) {
-  // CORREÇÃO: Adicionado 'await' que foi omitido na versão anterior.
-  const supabase = await createClient(); 
+export async function createPiece(pecaData) {
+  const supabase = await createClient();
   
-  // Array para rastrear imagens enviadas com sucesso e limpá-las em caso de erro
-  const uploadedImagePaths = []; 
-
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return { message: 'Usuário não autenticado.' };
+      throw new Error('Usuário não autenticado.');
     }
-
-    const pecaData = parseAndConvertFormData(formData);
     
-    // 1. Coleta todos os arquivos do formulário que não estão vazios
-    const filesToUpload = [
-      { name: 'fotoFrente', file: formData.get('fotoFrente') },
-      { name: 'fotoCostas', file: formData.get('fotoCostas') },
-      { name: 'fotoEtiqueta', file: formData.get('fotoEtiqueta') },
-      { name: 'fotoComposicao', file: formData.get('fotoComposicao') },
-      { name: 'fotoDetalhe', file: formData.get('fotoDetalhe') },
-      { name: 'fotoAvaria', file: formData.get('fotoAvaria') },
-    ].filter(entry => entry.file && entry.file.size > 0);
-
-    if (filesToUpload.length === 0 || filesToUpload[0].name !== 'fotoFrente') {
-      return { message: 'A imagem da frente é obrigatória.' };
-    }
-
-    // 2. Prepara e executa todos os uploads em paralelo para maior performance
-    const uploadPromises = filesToUpload.map(({ name, file }) => {
-      const fileExtension = file.name.split('.').pop();
-      const filePath = `${user.id}/${name}-${Date.now()}.${fileExtension}`;
-      
-      return supabase.storage.from('fotos-pecas').upload(filePath, file)
-        .then(result => {
-          if (result.error) {
-            throw new Error(`Falha no upload de ${name}: ${result.error.message}`);
-          }
-          uploadedImagePaths.push(result.data.path);
-          return result.data.path;
-        });
-    });
-
-    const successfullyUploadedPaths = await Promise.all(uploadPromises);
-
-    // 3. Obter as URLs públicas para todos os caminhos de imagem
-    const publicUrls = successfullyUploadedPaths.map(path => {
-        const { data } = supabase.storage.from('fotos-pecas').getPublicUrl(path);
-        if (!data || !data.publicUrl) {
-            throw new Error(`Não foi possível obter a URL pública para a imagem: ${path}`);
-        }
-        return data.publicUrl;
-    });
-
-    // 4. Salvar o array de URLs no banco de dados
-    pecaData.imagens = publicUrls;
     pecaData.user_id = user.id;
 
-    const { error: insertError } = await supabase.from('pecas').insert(pecaData);
+    const { error } = await supabase.from('pecas').insert(pecaData);
 
-    if (insertError) {
-      throw new Error(`Falha ao salvar dados da peça: ${insertError.message}`);
+    if (error) {
+      throw new Error(`Falha ao salvar dados da peça: ${error.message}`);
     }
 
   } catch (error) {
-    console.error('Erro em createPiece:', error.message);
-    
-    if (uploadedImagePaths.length > 0) {
-      console.log('Limpando imagens órfãs do storage:', uploadedImagePaths);
-      await supabase.storage.from('fotos-pecas').remove(uploadedImagePaths);
-    }
-    
     return { message: error.message };
   }
 
@@ -147,6 +92,35 @@ export async function createPiece(previousState, formData) {
   redirect('/painel/catalogo');
 }
 
+export async function updatePiece(id, pecaData) {
+  const supabase = await createClient();
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Usuário não autenticado.');
+    }
+    
+    const { error } = await supabase
+      .from('pecas')
+      .update(pecaData)
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      throw new Error(`Falha ao atualizar dados da peça: ${error.message}`);
+    }
+
+    revalidatePath('/painel/catalogo');
+    revalidatePath(`/peca/${id}`);
+    revalidatePath(`/painel/editar/${id}`);
+
+  } catch (error) {
+    return { message: error.message };
+  }
+  
+  redirect('/painel/catalogo');
+}
 
 // --- NOVA FUNÇÃO ---
 export async function deletePiece(formData) {
@@ -199,74 +173,4 @@ export async function deletePiece(formData) {
   }
 }
 
-// --- FUNÇÃO DE ATUALIZAÇÃO CORRIGIDA ---
-export async function updatePiece(id, formData) {
-  const supabase = await createClient();
-  const uploadedImagePaths = [];
 
-  if (!id) return { message: 'ID da peça não fornecido.' };
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { message: 'Usuário não autenticado.' };
-
-    const updatedData = parseAndConvertFormData(formData);
-
-    // Upload de novas imagens se fornecidas
-    const filesToUpload = [
-      { name: 'fotoFrente', file: formData.get('fotoFrente') },
-      { name: 'fotoCostas', file: formData.get('fotoCostas') },
-      { name: 'fotoEtiqueta', file: formData.get('fotoEtiqueta') },
-      { name: 'fotoComposicao', file: formData.get('fotoComposicao') },
-      { name: 'fotoDetalhe', file: formData.get('fotoDetalhe') },
-      { name: 'fotoAvaria', file: formData.get('fotoAvaria') },
-    ].filter(entry => entry.file && entry.file.size > 0);
-
-    if (filesToUpload.length > 0) {
-      const uploadPromises = filesToUpload.map(({ name, file }) => {
-        const ext = file.name.split('.').pop();
-        const filePath = `${user.id}/${name}-${Date.now()}.${ext}`;
-
-        return supabase.storage.from('fotos-pecas').upload(filePath, file)
-          .then(result => {
-            if (result.error) throw new Error(`Erro ao enviar ${name}: ${result.error.message}`);
-            uploadedImagePaths.push(result.data.path);
-            return result.data.path;
-          });
-      });
-
-      const newPaths = await Promise.all(uploadPromises);
-
-      const publicUrls = newPaths.map(path => {
-        const { data } = supabase.storage.from('fotos-pecas').getPublicUrl(path);
-        if (!data?.publicUrl) throw new Error(`Erro ao obter URL pública de ${path}`);
-        return data.publicUrl;
-      });
-
-      updatedData.imagens = publicUrls;
-    }
-
-    // Atualiza no banco
-    const { error } = await supabase
-      .from('pecas')
-      .update(updatedData)
-      .eq('id', id)
-      .eq('user_id', user.id);
-
-    if (error) throw new Error(`Falha ao atualizar peça: ${error.message}`);
-
-    revalidatePath('/painel/catalogo');
-    revalidatePath(`/peca/${id}`);
-    revalidatePath(`/painel/editar/${id}`);
-    redirect('/painel/catalogo');
-
-  } catch (error) {
-    console.error('Erro ao atualizar peça:', error);
-
-    if (uploadedImagePaths.length > 0) {
-      await supabase.storage.from('fotos-pecas').remove(uploadedImagePaths);
-    }
-
-    return { message: error.message };
-  }
-}

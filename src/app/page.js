@@ -143,18 +143,35 @@ export default function Home() {
       {loading ? (
         <p className="text-center text-stone-500">Carregando peças...</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {pecasExibidas.map(peca => (
-            <div key={peca.id} className="border rounded-lg p-2 shadow-sm flex flex-col">
-              <Link href={`/peca/${peca.id}`}>
-                <Image src={peca.imagens?.[0]} alt={peca.nome} width={300} height={300} className="rounded" />
-                <h2 className="font-semibold">{peca.nome}</h2>
-              </Link>
-              <p className="text-rose-600 font-bold mt-1">R$ {peca.preco}</p>
+<div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+  {pecasExibidas.map(peca => (
+    // CARD ATUALIZADO:
+    // 1. Removido p-2 e adicionado overflow-hidden para a imagem preencher o espaço.
+    // 2. A imagem agora usa w-full e object-cover para se ajustar ao card.
+    <div key={peca.id} className="border border-rose-200 rounded-lg shadow-sm flex flex-col bg-amber-100 overflow-hidden">
+      
+      {/* Link envolvendo a imagem, que agora ocupa toda a largura */}
+      <Link href={`/peca/${peca.id}`}>
+        <Image 
+          src={peca.imagens?.[0]} 
+          alt={peca.nome} 
+          width={400} 
+          height={400} 
+          className="w-full h-auto object-cover " // aspect-square para manter a imagem quadrada
+        />
+      </Link>
+      
+      {/* 3. Nova div criada para conter o texto, com seu próprio padding e alinhamento. */}
+      <div className="p-3 text-center">
+        <Link href={`/peca/${peca.id}`}>
+          <h2 className="font-semibold text-cyan-800 truncate">{peca.nome}</h2>
+        </Link>
+        <p className="text-rose-600 font-bold mt-1">R$ {peca.preco.toFixed(2)}</p>
+      </div>
 
-            </div>
-          ))}
-        </div>
+    </div>
+  ))}
+</div>
       )}
 
       {/* Botão flutuante para abrir carrinho */}

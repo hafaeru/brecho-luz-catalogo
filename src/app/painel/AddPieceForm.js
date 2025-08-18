@@ -7,15 +7,12 @@ import { createPiece, updatePiece } from './actions.js';
 import imageCompression from 'browser-image-compression';
 import ManageImages from './ManageImages';
 import Image from 'next/image';
+import FocalPointPicker from '@/components/FocalPointPicker';
 
-// Seus componentes internos
+// Seus componentes internos (inalterados)
 function SubmitButton({ isEditing, loading }) {
     return (
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full px-4 py-3 font-bold text-white bg-rose-500 rounded-md hover:bg-rose-600 transition-colors disabled:bg-rose-300 disabled:cursor-not-allowed"
-      >
+      <button type="submit" disabled={loading} className="w-full px-4 py-3 font-bold text-white bg-rose-500 rounded-md hover:bg-rose-600 transition-colors disabled:bg-rose-300 disabled:cursor-not-allowed">
         {loading ? 'Salvando...' : (isEditing ? 'Atualizar Peça' : 'Salvar Peça')}
       </button>
     );
@@ -23,38 +20,20 @@ function SubmitButton({ isEditing, loading }) {
 
 function ImageInputWithPreview({ label, id, onFileChange, required = false }) {
     const [preview, setPreview] = useState(null);
-  
     const handleFileChange = (e) => {
       const file = e.target.files?.[0] || null;
       if (file) {
         const reader = new FileReader();
         reader.onloadend = () => setPreview(reader.result);
         reader.readAsDataURL(file);
-      } else {
-        setPreview(null);
-      }
+      } else { setPreview(null); }
       onFileChange(file);
     };
-  
     return (
       <div>
-        <label htmlFor={id} className="text-sm text-gray-600">
-          {label} {required && '(obrigatória)'}
-        </label>
-        <input
-          type="file"
-          id={id}
-          name={id}
-          accept="image/*"
-          onChange={handleFileChange}
-          required={required}
-          className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
-        {preview && (
-          <div className="mt-3 relative w-32 h-32 rounded-lg border border-gray-300 shadow-sm">
-            <Image src={preview} alt={`Pré-visualização de ${label}`} fill style={{ objectFit: 'cover' }} className="rounded-lg" />
-          </div>
-        )}
+        <label htmlFor={id} className="text-sm text-gray-600">{label} {required && '(obrigatória)'}</label>
+        <input type="file" id={id} name={id} accept="image/*" onChange={handleFileChange} required={required} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+        {preview && (<div className="mt-3 relative w-32 h-32 rounded-lg border border-gray-300 shadow-sm"><Image src={preview} alt={`Pré-visualização de ${label}`} fill style={{ objectFit: 'cover' }} className="rounded-lg" /></div>)}
       </div>
     );
 }
@@ -64,6 +43,7 @@ export default function AddPieceForm({ pecaInicial }) {
   const supabase = createClientComponentClient();
   const router = useRouter();
   
+  // Estados do formulário (COMPLETOS)
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState('');
   const [preco, setPreco] = useState('');
@@ -88,6 +68,9 @@ export default function AddPieceForm({ pecaInicial }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [focalX, setFocalX] = useState(0.5);
+  const [focalY, setFocalY] = useState(0.5);
+  const [previewData, setPreviewData] = useState(null); // Estado para a pré-visualização
 
   useEffect(() => {
     if (pecaInicial) {
@@ -107,22 +90,41 @@ export default function AddPieceForm({ pecaInicial }) {
         setTags(pecaInicial.tags || '');
       }
       setMedidas({
-          busto: pecaInicial.medida_busto || '',
-          ombro: pecaInicial.medida_ombro || '',
-          manga: pecaInicial.medida_manga || '',
-          cintura: pecaInicial.medida_cintura || '',
-          quadril: pecaInicial.medida_quadril || '',
-          gancho: pecaInicial.medida_gancho || '',
-          comprimento: pecaInicial.medida_comprimento || '',
+        busto: pecaInicial.medida_busto || '',
+        ombro: pecaInicial.medida_ombro || '',
+        manga: pecaInicial.medida_manga || '',
+        cintura: pecaInicial.medida_cintura || '',
+        quadril: pecaInicial.medida_quadril || '',
+        gancho: pecaInicial.medida_gancho || '',
+        comprimento: pecaInicial.medida_comprimento || '',
       });
       setModelagem(pecaInicial.modelagem || '');
       setStatus(pecaInicial.status || 'Disponível');
       setListaImagensEdit(pecaInicial.imagens || []);
+      setFocalX(pecaInicial.focal_x || 0.5);
+      setFocalY(pecaInicial.focal_y || 0.5);
     }
   }, [pecaInicial]);
 
   const handleMedidaChange = (e) => {
     setMedidas(prevMedidas => ({ ...prevMedidas, [e.target.name]: e.target.value }));
+  };
+  
+  const handleFocalPointChange = (point) => {
+    setFocalX(point.x);
+    setFocalY(point.y);
+  };
+
+  // Função para o botão "OK"
+  const handleApplyPreview = () => {
+    const imageUrl = listaImagensEdit[0];
+    if (imageUrl) {
+      setPreviewData({
+        url: typeof imageUrl === 'string' ? imageUrl : URL.createObjectURL(imageUrl),
+        x: focalX,
+        y: focalY,
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -182,7 +184,9 @@ export default function AddPieceForm({ pecaInicial }) {
         medida_quadril: parseFloat(medidas.quadril) || null,
         medida_gancho: parseFloat(medidas.gancho) || null,
         medida_comprimento: parseFloat(medidas.comprimento) || null,
-        imagens: fotoUrlsFinais 
+        imagens: fotoUrlsFinais,
+        focal_x: focalX,
+        focal_y: focalY
       };
       if (pecaInicial) {
         await updatePiece(pecaInicial.id, pecaData, urlsParaDeletar);
@@ -200,7 +204,15 @@ export default function AddPieceForm({ pecaInicial }) {
   };
 
   const MedidasFields = useMemo(() => {
-    // ... (Sua lógica de MedidasFields permanece inalterada)
+    const camposPartesDeCima = (<><input name="busto" value={medidas.busto || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Busto/Tórax (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/><input name="ombro" value={medidas.ombro || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Ombro a ombro (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/><input name="manga" value={medidas.manga || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento da Manga (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/><input name="comprimento" value={medidas.comprimento || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/></>);
+    const camposPartesDeBaixo = (<><input name="cintura" value={medidas.cintura || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Cintura (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/><input name="quadril" value={medidas.quadril || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Quadril (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/><input name="gancho" value={medidas.gancho || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Gancho/Cavalo (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/><input name="comprimento_calca" value={medidas.comprimento_calca || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/></>);
+    switch(categoria) {
+      case 'Blusas': case 'Camisas': case 'Tops': case 'Body': case 'Casacos e Jaquetas': case 'Tricot': case 'Alfaiataria': case 'Coletes': return camposPartesDeCima;
+      case 'Calças': case 'Shorts': return camposPartesDeBaixo;
+      case 'Saias': return <><input name="cintura" value={medidas.cintura || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Cintura (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/><input name="quadril" value={medidas.quadril || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Quadril (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/><input name="comprimento" value={medidas.comprimento || ''} onChange={handleMedidaChange} type="number" step="0.1" placeholder="Comprimento Total (cm)" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"/></>;
+      case 'Vestidos': case 'Macacão / Macaquinho': return <div className="contents">{camposPartesDeCima}{camposPartesDeBaixo}</div>;
+      default: return null;
+    }
   }, [categoria, medidas]);
 
   return (
@@ -214,7 +226,6 @@ export default function AddPieceForm({ pecaInicial }) {
       {error && <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded-md"><p>{error}</p></div>}
       {message && <div className="p-3 bg-green-100 border border-green-400 text-green-700 rounded-md"><p>{message}</p></div>}
       
-      {/* --- SEÇÃO DE CAMPOS DO FORMULÁRIO (COMPLETA) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label htmlFor="nome" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Nome da Peça</label>
@@ -224,13 +235,11 @@ export default function AddPieceForm({ pecaInicial }) {
           <label htmlFor="categoria" className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Categoria</label>
           <select id="categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
             <option value="">-- Selecione --</option>
-            {/* Exemplo de como usar constantes - ajuste conforme seu arquivo `constants` */}
             {['Alfaiataria', 'Blusas', 'Calçados', 'Camisas', 'Casacos e Jaquetas', 'Coletes', 'Conjuntos', 'Saias', 'Shorts', 'Tops', 'Body', 'Tricot', 'Vestidos', 'Macacão / Macaquinho', 'Acessórios'].map(cat => <option key={cat}>{cat}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Seção de Medidas (se aplicável) */}
       {MedidasFields && (
         <div>
           <label className="block text-sm font-medium text-cyan-800" style={{ fontFamily: 'var(--font-poppins)' }}>Medidas Precisas (cm)</label>
@@ -300,8 +309,6 @@ export default function AddPieceForm({ pecaInicial }) {
         </div>
       )}
 
-      {/* --- SEÇÃO DE IMAGENS --- */}
-      {/* Bloco de UPLOAD para PEÇAS NOVAS */}
       {!pecaInicial && (
         <div>
           <label className="block text-sm font-medium text-cyan-800 mb-2" style={{ fontFamily: 'var(--font-poppins)' }}>Fotos da Peça</label>
@@ -316,12 +323,40 @@ export default function AddPieceForm({ pecaInicial }) {
         </div>
       )}
 
-      {/* Bloco de GERENCIAMENTO para PEÇAS EXISTENTES */}
       {pecaInicial && (
-        <ManageImages
-          imagensIniciais={pecaInicial.imagens}
-          onImagensChange={setListaImagensEdit}
-        />
+        <>
+          <ManageImages
+            imagensIniciais={pecaInicial.imagens}
+            onImagensChange={setListaImagensEdit}
+          />
+          <FocalPointPicker 
+            imageUrl={listaImagensEdit[0]}
+            focalX={focalX}
+            focalY={focalY}
+            onFocalPointChange={handleFocalPointChange}
+            onApply={handleApplyPreview}
+          />
+          {previewData && (
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-cyan-800 mb-2" style={{ fontFamily: 'var(--font-poppins)' }}>
+                Pré-visualização da Miniatura
+              </label>
+              <div className="w-40 p-1 bg-stone-200 rounded-lg inline-block">
+                <div className="border border-rose-200 rounded-lg shadow-sm flex flex-col bg-amber-100 overflow-hidden">
+                  <div className="block w-full aspect-[3/4] overflow-hidden rounded-t-lg relative">
+<Image
+  src={previewData.url}
+  alt="Pré-visualização da miniatura"
+  fill
+  sizes="160px"
+  style={thumbnailStyle}
+/>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
       
       <SubmitButton isEditing={!!pecaInicial} loading={loading} />

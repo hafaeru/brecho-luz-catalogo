@@ -15,7 +15,10 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext"; // Caminho corrigido com @
-import CartIcon from "@/app/CartIcon"; // Caminho corrigido com @
+
+import Footer from '@/components/Footer';
+import { Toaster } from 'react-hot-toast';
+import FloatingButtons from '@/components/FloatingButtons';
 
 
 // --- FONTES DO PROJETO ---
@@ -49,11 +52,20 @@ export default function RootLayout({ children }) {
           ${manrope.variable} ${spaceGrotesk.variable} antialiased
         `}
       >
-        <CartProvider>
-          {children}
-          <CartIcon /> {/* Ícone do carrinho agora flutuante */}
-        </CartProvider>
+        <Toaster 
+      position="top-center" // Posição das notificações
+      toastOptions={{
+        duration: 3000, // Duração de 3 segundos
+      }}
+    />
+          <CartProvider>
+      <Toaster />
+      <main>{children}</main>
+      <Footer />
+      <FloatingButtons />
+    </CartProvider>
       </body>
+      
     </html>
   );
 }

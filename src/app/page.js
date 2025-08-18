@@ -5,6 +5,9 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
+import { FaWhatsapp } from 'react-icons/fa';
+import CartSidebar from '@/components/CartSidebar';
+import CardSkeleton from '@/components/CardSkeleton';
 
 export default function Home() {
   const supabase = createClientComponentClient();
@@ -141,8 +144,13 @@ export default function Home() {
 
         
       {loading ? (
-        <p className="text-center text-stone-500">Carregando peças...</p>
-      ) : (
+  // Enquanto carrega, exibe uma grade de 10 esqueletos
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    {Array.from({ length: 10 }).map((_, index) => (
+      <CardSkeleton key={index} />
+    ))}
+      </div>
+) : (
 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
   {pecasExibidas.map(peca => (
     // CARD ATUALIZADO:
@@ -151,16 +159,15 @@ export default function Home() {
     <div key={peca.id} className="border border-rose-200 rounded-lg shadow-sm flex flex-col bg-amber-100 overflow-hidden">
       
       {/* Link envolvendo a imagem, que agora ocupa toda a largura */}
-       <Link href={`/peca/${peca.id}`} className="block aspect-[3/4] w-full">
-     <Image
+<Link href={`/peca/${peca.id}`} className="block w-full aspect-[3/4] overflow-hidden rounded-t-lg">
+  <Image
     src={peca.imagens?.[0]}
     alt={peca.nome}
     width={400}
-    height={533} // Ajuste a altura proporcionalmente (400 * 4 / 3)
-    className="w-full h-full object-contain"
-       />
-       </Link>
-      
+    height={533}
+    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+  />
+</Link>
       {/* 3. Nova div criada para conter o texto, com seu próprio padding e alinhamento. */}
       <div className="p-3 text-center">
         <Link href={`/peca/${peca.id}`}>
@@ -175,19 +182,45 @@ export default function Home() {
       )}
 
       {/* Botão flutuante para abrir carrinho */}
-      <button onClick={() => setShowCarrinho(true)} className="fixed bottom-5 right-5 bg-orange-600 text-white p-4 rounded-full shadow-lg hover:scale-110 transition z-50">
-        🛒 {cart.length}
-      </button>
+<button 
+  onClick={() => setShowCarrinho(true)} 
+  className="fixed bottom-5 right-5 bg-orange-600 text-white w-16 h-16 rounded-full shadow-lg hover:scale-110 transition z-50 flex items-center justify-center"
+>
+  <span className="text-2xl">🛒</span>
+  {cart.length > 0 && (
+    <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+      {cart.length}
+    </span>
+  )}
+</button>
 
 {/* BOTÃO FLUTUANTE: Grupo VIP (WhatsApp) */}
 <a
-  href="https://chat.whatsapp.com/DRKWqlxvFDCFaun2aZCiiB"
+  href="https://chat.whatsapp.com/DRKWqlxvFDCFaun2aZCiiB" // Lembre-se de verificar se este link está correto
   target="_blank"
   rel="noopener noreferrer"
-  className="fixed bottom-24 right-5 bg-green-600 text-white p-4 rounded-full shadow-lg hover:scale-110 transition z-50"
+  aria-label="Fale Conosco pelo WhatsApp"
+  className="fixed bottom-24 right-5 bg-green-600 text-white w-16 h-16 rounded-full shadow-lg hover:scale-110 transition z-50 flex items-center justify-center"
 >
-  🟢
+  <FaWhatsapp size={32} />
 </a>
+
+return (
+    <main className="container mx-auto p-4 sm:p-8 relative">
+      {/* ... todo o seu conteúdo da página ... */}
+
+      {/* Botões flutuantes */}
+      <button onClick={() => setShowCarrinho(true)} className="...">
+        {/* ... */}
+      </button>
+      <a href="..." className="...">
+        {/* ... */}
+      </a>
+
+      {/* ADICIONE O COMPONENTE AQUI */}
+      <CartSidebar isOpen={showCarrinho} onClose={() => setShowCarrinho(false)} />
+    </main>
+  );
     </main>
   );
 }

@@ -143,6 +143,7 @@ export async function updatePiece(id, pecaData, urlsParaDeletar) {
     revalidatePath('/painel/catalogo');
     revalidatePath(`/peca/${id}`);
     revalidatePath(`/painel/editar/${id}`);
+    revalidatePath('/'); 
 
   } catch (error) {
     return { message: error.message };

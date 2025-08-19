@@ -35,7 +35,7 @@ export default function Home() {
   const [medidasBusca, setMedidasBusca] = useState({ busto: '', cintura: '', quadril: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 20;
 
  useEffect(() => {
   const getPecas = async () => {
@@ -95,7 +95,7 @@ export default function Home() {
   return (
     <main className="container mx-auto p-4 sm:p-8 relative">
       <div className="text-center mb-8">
-        <h1 className="text-8xl sm:text-9xl font-normal text-amber-800" style={{ fontFamily: 'var(--font-great-vibes)' }}>
+        <h1 className="text-8xl sm:text-8xl font-normal text-amber-800" style={{ fontFamily: 'var(--font-great-vibes)' }}>
           Brechó Luz
         </h1>
         <p className="text-lg text-cyan-800 mt-2" style={{ fontFamily: 'var(--font-playfair-display)' }}>

@@ -50,6 +50,7 @@ export default function RootLayout({ children }) {
           ${playfairDisplay.variable} ${lato.variable} ${mulish.variable} 
           ${nunito.variable} ${poppins.variable} ${quicksand.variable} 
           ${manrope.variable} ${spaceGrotesk.variable} antialiased
+          flex flex-col min-h-screen
         `}
       >
         <Toaster 
@@ -59,8 +60,8 @@ export default function RootLayout({ children }) {
       }}
     />
           <CartProvider>
-      <Toaster />
-      <main>{children}</main>
+      
+      <main className="flex-grow">{children}</main>
       <Footer />
       <FloatingButtons />
     </CartProvider>
